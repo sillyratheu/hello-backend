@@ -1,3 +1,2 @@
 Flask
-request
 gunicorn
