@@ -3,15 +3,13 @@ from flask import Flask, redirect, render_template_string, request, session, url
 import requests
 
 app = Flask(__name__)
-# Session secure rakhar jonno random secret key
 app.secret_key = os.urandom(24)
 
-# Apnar dewa GitHub App Credentials (Cleaned up)
 GITHUB_CLIENT_ID = "Iv23libgx7qvJ0ICF7Te"
 GITHUB_CLIENT_SECRET = "ff274386956b45b6b07318c0428d769c4c442cc8"
 
 
-# --- MODERN HOME PAGE TEMPLATE (Tailwind CSS) ---
+# --- HOME PAGE TEMPLATE ---
 HOME_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -55,7 +53,7 @@ HOME_TEMPLATE = """
 """
 
 
-# --- DASHBOARD TEMPLATE ---
+# --- DASHBOARD TEMPLATE WITH REPO SELECTOR & CUSTOM LINK ---
 DASHBOARD_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -68,24 +66,54 @@ DASHBOARD_TEMPLATE = """
     <style>body { font-family: 'Inter', sans-serif; }</style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen p-6">
-    <div class="max-w-4xl mx-auto">
+    <div class="max-w-2xl mx-auto">
+        <!-- Top Profile Bar -->
         <div class="flex justify-between items-center bg-slate-900 border border-slate-800 rounded-2xl p-6 mb-6 shadow-xl">
             <div class="flex items-center gap-4">
                 <img src="{{ user.avatar_url }}" class="w-12 h-12 rounded-full border border-blue-500/30">
                 <div>
                     <h2 class="text-lg font-bold text-white">Dashboard</h2>
-                    <p class="text-xs text-slate-400">Welcome back, @{{ user.login }}</p>
+                    <p class="text-xs text-slate-400">@{{ user.login }}</p>
                 </div>
             </div>
             <a href="/" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 rounded-xl text-sm font-medium transition">Home</a>
         </div>
         
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl text-center">
-            <h3 class="text-xl font-semibold mb-2">Select Repository & Build APK</h3>
-            <p class="text-slate-400 text-sm mb-6">Your GitHub connection is active. Next step: We will fetch your repositories here!</p>
-            <div class="p-8 border border-dashed border-slate-800 rounded-xl bg-slate-950/50">
-                <p class="text-slate-400 text-sm">Repo selector and configuration UI coming up next! 🚀</p>
-            </div>
+        <!-- Build Configuration Card -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl">
+            <h3 class="text-xl font-semibold mb-2">Build Your APK</h3>
+            <p class="text-slate-400 text-sm mb-6">Select one of your repositories or paste any public repository link below.</p>
+            
+            <form action="/start-build" method="POST" class="space-y-5">
+                <!-- Option 1: Select from User Repos -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Select Your Repository</label>
+                    <select name="selected_repo" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 focus:outline-none focus:border-blue-500">
+                        <option value="">-- Choose from your repositories --</option>
+                        {% for repo in repos %}
+                            <option value="{{ repo.clone_url }}">{{ repo.full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="text-center text-xs text-slate-500 font-semibold">— OR —</div>
+
+                <!-- Option 2: Custom Public Repo Link -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">Paste Public Repository URL</label>
+                    <input type="url" name="custom_repo" placeholder="https://github.com/username/repository" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500">
+                </div>
+
+                <!-- App Customization Fields -->
+                <div>
+                    <label class="block text-sm font-medium text-slate-300 mb-2">App Name</label>
+                    <input type="text" name="app_name" required placeholder="My Awesome App" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-blue-500">
+                </div>
+
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-3 px-4 rounded-xl transition duration-200 shadow-lg shadow-blue-600/20 cursor-pointer">
+                    Configure & Proceed to Build 🚀
+                </button>
+            </form>
         </div>
     </div>
 </body>
@@ -142,7 +170,36 @@ def auth_callback():
 def dashboard():
     if "user" not in session:
         return redirect(url_for("home"))
-    return render_template_string(DASHBOARD_TEMPLATE, user=session["user"])
+    
+    access_token = session.get("access_token")
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Accept": "application/vnd.github+json"
+    }
+    
+    # Fetch user's GitHub repositories
+    repos_response = requests.get("https://api.github.com/user/repos?per_page=100&sort=updated", headers=headers)
+    repos = repos_response.json() if repos_response.status_code == 200 else []
+    
+    return render_template_string(DASHBOARD_TEMPLATE, user=session["user"], repos=repos)
+
+
+@app.route("/start-build", methods=["POST"])
+def start_build():
+    if "user" not in session:
+        return redirect(url_for("home"))
+    
+    selected_repo = request.form.get("selected_repo")
+    custom_repo = request.form.get("custom_repo")
+    app_name = request.form.get("app_name")
+    
+    # Target repo thik kora (jodi custom link dey tahole seta, nahole dropdown er ta)
+    target_repo = custom_repo if custom_repo else selected_repo
+    
+    if not target_repo:
+        return "Error: Please select a repository or enter a public repo link!", 400
+
+    return f"Build requested successfully for Repo: {target_repo} | App Name: {app_name}! Ekhon amra GitHub Action trigger korar backend logic add korbo."
 
 
 @app.route("/logout")
