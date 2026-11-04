@@ -6,8 +6,8 @@ app = Flask(__name__)
 # Session secure rakhar jonno random secret key
 app.secret_key = os.urandom(24)
 
-# Apnar dewa GitHub App Credentials
-GITHUB_CLIENT_ID = "Iv23libgx7qvJ0ICF7Te[span_0](start_span)"[span_0](end_span)
+# Apnar dewa GitHub App Credentials (Cleaned up)
+GITHUB_CLIENT_ID = "Iv23libgx7qvJ0ICF7Te"
 GITHUB_CLIENT_SECRET = "ff274386956b45b6b07318c0428d769c4c442cc8"
 
 
@@ -82,7 +82,7 @@ DASHBOARD_TEMPLATE = """
         
         <div class="bg-slate-900 border border-slate-800 rounded-2xl p-8 shadow-xl text-center">
             <h3 class="text-xl font-semibold mb-2">Select Repository & Build APK</h3>
-            <p class="text-slate-400 text-sm mb-6">Your GitHub connection is active. Here we will load your repositories to build the APK.</p>
+            <p class="text-slate-400 text-sm mb-6">Your GitHub connection is active. Next step: We will fetch your repositories here!</p>
             <div class="p-8 border border-dashed border-slate-800 rounded-xl bg-slate-950/50">
                 <p class="text-slate-400 text-sm">Repo selector and configuration UI coming up next! 🚀</p>
             </div>
@@ -100,7 +100,6 @@ def home():
 
 @app.route("/login")
 def login():
-    # GitHub OAuth login redirect with repo and workflow scopes
     github_auth_url = f"https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&scope=repo,workflow"
     return redirect(github_auth_url)
 
@@ -133,7 +132,6 @@ def auth_callback():
     user_response = requests.get("https://api.github.com/user", headers=user_headers)
     user_data = user_response.json()
 
-    # Save user details and token in Flask session
     session["user"] = user_data
     session["access_token"] = access_token
 
