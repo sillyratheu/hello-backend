@@ -1,0 +1,23 @@
+name: Cloud APK Builder
+
+on:
+  repository_dispatch:
+    types: [build-apk]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Builder Repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python & Java
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Read Payload Data
+        run: |
+          echo "User Repo: ${{ github.event.client_payload.repo_url }}"
+          echo "App Name: ${{ github.event.client_payload.app_name }}"
+          # Ekhane amra user er source code clone kore build script run korbo
