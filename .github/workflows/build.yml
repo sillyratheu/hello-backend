@@ -35,19 +35,32 @@ jobs:
           git clone "$USER_REPO" user_project
           cd user_project
           
-          # Jodi user-er repo-te pyproject.toml na thake, tahole briefcase create kore nibe
+          # Create a clean, standard pyproject.toml if missing
           if [ ! -f "pyproject.toml" ]; then
-              echo "pyproject.toml not found, initializing briefcase project..."
-              briefcase new --no-input \
-                --formal-name "$APP_NAME" \
-                --app-name "myapp" \
-                --bundle "org.shahajjo" \
-                --gui PyQt5
+              echo "pyproject.toml not found, generating standard config..."
+              cat << 'EOF' > pyproject.toml
+          [tool.briefcase]
+          project_name = "Shahajjo App"
+          bundle = "org.shahajjo"
+          version = "0.1.0"
+          app_name = "myapp"
+          author = "Shahajjo"
+          author_email = "support@shahajjo.com"
+
+          [tool.briefcase.app.myapp]
+          formal_name = "Shahajjo App"
+          description = "Cloud compiled app via Shahajjo"
+          sources = ['main.py']
+          sources_requires = []
+          platforms = [
+              "android"
+          ]
+          EOF
           fi
           
           # Build Android APK using briefcase
-          briefcase create android
-          briefcase build android
+          briefcase create android --no-input
+          briefcase build android --no-input
 
       - name: Upload APK as GitHub Artifact
         uses: actions/upload-artifact@v4
