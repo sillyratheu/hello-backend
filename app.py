@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from github import Github, GithubException
@@ -11,8 +12,11 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-change-me")
 
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
-GITHUB_BUILDER_OWNER = os.getenv("GITHUB_BUILDER_OWNER")
-GITHUB_BUILDER_REPO = os.getenv("GITHUB_BUILDER_REPO")
+# এটি আপনার গিটহাব টোকেন (Render-এ সেট করা)
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN") 
+# আপনার রিপো যেখানে বিল্ড হবে
+GITHUB_BUILDER_OWNER = os.getenv("GITHUB_BUILDER_OWNER", "sillyratheu")
+GITHUB_BUILDER_REPO = os.getenv("GITHUB_BUILDER_REPO", "hello-backend")
 
 # ---------- Landing ----------
 @app.route("/")
@@ -22,7 +26,6 @@ def landing():
 # ---------- Auth ----------
 @app.route("/login")
 def login():
-    # store where to go after login
     session["next"] = request.args.get("next", "select")
     url = (
         "https://github.com/login/oauth/authorize"
@@ -36,7 +39,6 @@ def callback():
     code = request.args.get("code")
     if not code:
         return "Authorization failed.", 400
-
     resp = requests.post(
         "https://github.com/login/oauth/access_token",
         headers={"Accept": "application/json"},
@@ -48,8 +50,7 @@ def callback():
     )
     token = resp.json().get("access_token")
     if not token:
-        return "Sign in failed. Please try again.", 400
-
+        return "Sign in failed.", 400
     session["token"] = token
     return redirect(url_for("select_repo"))
 
@@ -71,52 +72,25 @@ def api_repos():
         return jsonify({"error": "not signed in"}), 401
     gh = Github(session["token"])
     user = gh.get_user()
-    repos = [
-        {"name": r.name, "full_name": r.full_name, "private": r.private, "url": r.html_url}
-        for r in user.get_repos()
-    ]
+    repos = [{"name": r.name, "full_name": r.full_name} for r in user.get_repos()]
     return jsonify(repos)
 
 @app.route("/api/create-project", methods=["POST"])
 def create_project():
-    """Creates a new repo for the user by copying the builder template."""
     if "token" not in session:
         return jsonify({"error": "not signed in"}), 401
-
     data = request.json or {}
     repo_name = data.get("repo_name", "").strip()
-    if not repo_name:
-        return jsonify({"error": "repo name required"}), 400
-
+    
+    # ইউজারের টোকেন দিয়ে তার অ্যাকাউন্টে নতুন রিপো তৈরি হবে
     gh = Github(session["token"])
     user = gh.get_user()
-    source = gh.get_repo(f"{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}")
-
+    
     try:
-        new_repo = user.create_repo(repo_name, auto_init=False)
+        new_repo = user.create_repo(repo_name, auto_init=True)
+        return jsonify({"repo": new_repo.full_name})
     except GithubException as e:
-        if e.status == 422:
-            new_repo = user.get_repo(repo_name)
-        else:
-            return jsonify({"error": "Could not create project."}), 400
-
-    copied = 0
-    try:
-        items = source.get_contents("")
-        while items:
-            item = items.pop(0)
-            if item.type == "file":
-                try:
-                    new_repo.create_file(item.path, f"Import {item.path}", item.decoded_content)
-                    copied += 1
-                except GithubException:
-                    pass
-            elif item.type == "dir":
-                items.extend(source.get_contents(item.path))
-    except GithubException:
-        pass
-
-    return jsonify({"repo": new_repo.full_name, "copied": copied})
+        return jsonify({"error": "Could not create project. Maybe it already exists."}), 400
 
 # ---------- Editor ----------
 @app.route("/editor")
@@ -128,7 +102,7 @@ def editor():
         return redirect(url_for("select_repo"))
     return render_template("editor.html", repo=repo)
 
-# ---------- File APIs ----------
+# ---------- File APIs (ইউজারের নিজের রিপোতে সেভ হবে) ----------
 @app.route("/api/file", methods=["GET"])
 def get_file():
     if "token" not in session:
@@ -160,61 +134,79 @@ def save_file():
         repo.create_file(path, f"Create {path}", content)
     return jsonify({"status": "saved"})
 
-# ---------- Build ----------
+# ---------- Build System (এখানে আপনার GITHUB_TOKEN ব্যবহার হবে) ----------
 @app.route("/api/build", methods=["POST"])
 def build():
     if "token" not in session:
         return jsonify({"error": "not signed in"}), 401
-    data = request.json
-    repo_full = data["repo"]
-    branch = data.get("branch", "main")
-    gh = Github(session["token"])
-    repo = gh.get_repo(repo_full)
+    
+    # ইউজার যে রিপোতে কাজ করছে, সেটার নাম নেওয়া হচ্ছে
+    user_repo = request.json["repo"] 
+    
+    # অ্যাডমিন (আপনার) টোকেন দিয়ে আপনার বিল্ডার রিপোতে অ্যাক্সেস নেওয়া হচ্ছে
+    admin_gh = Github(GITHUB_TOKEN)
+    try:
+        builder_repo = admin_gh.get_repo(f"{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}")
+    except GithubException:
+        return jsonify({"error": "Builder repository not found. Check your GITHUB_TOKEN."}), 500
 
+    # ১. ওয়ার্কফ্লো ফাইল আপনার রিপোতে আপডেট করা
     workflow_path = ".github/workflows/build.yml"
     workflow_content = open("workflow_template.yml").read()
     try:
-        existing = repo.get_contents(workflow_path)
-        repo.update_file(workflow_path, "Update build workflow", workflow_content, existing.sha)
+        existing = builder_repo.get_contents(workflow_path)
+        builder_repo.update_file(workflow_path, "Update build workflow", workflow_content, existing.sha)
     except GithubException:
-        repo.create_file(workflow_path, "Add build workflow", workflow_content)
+        builder_repo.create_file(workflow_path, "Add build workflow", workflow_content)
 
-    url = f"https://api.github.com/repos/{repo_full}/actions/workflows/build.yml/dispatches"
+    # ২. আপনার রিপোতে GitHub Actions ট্রিগার করা
+    url = f"https://api.github.com/repos/{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}/actions/workflows/build.yml/dispatches"
     r = requests.post(
         url,
         headers={
-            "Authorization": f"Bearer {session['token']}",
+            "Authorization": f"Bearer {GITHUB_TOKEN}",
             "Accept": "application/vnd.github+json",
         },
-        json={"ref": branch},
+        json={"ref": builder_repo.default_branch},
     )
+    
     if r.status_code not in (204, 201):
-        return jsonify({"error": "Build could not be started."}), 400
-    return jsonify({"status": "building"})
+        return jsonify({"error": f"GitHub API Error: {r.text}"}), 400
+        
+    # ৩. বিল্ড শুরু হয়েছে, ইউজারকে জানানো
+    return jsonify({"status": "building", "user_repo": user_repo})
 
+# ---------- Build Status + Download Link ----------
 @app.route("/api/build-status")
 def build_status():
     if "token" not in session:
         return jsonify({"error": "not signed in"}), 401
-    repo_full = request.args.get("repo")
-    gh = Github(session["token"])
-    repo = gh.get_repo(repo_full)
-    runs = repo.get_workflow_runs()
-    if not runs.totalCount:
-        return jsonify({"status": "no runs"})
-    latest = runs[0]
-    result = {
-        "status": latest.status,
-        "conclusion": latest.conclusion,
-        "url": latest.html_url,
-        "artifacts": [],
-    }
+    
+    # আপনার রিপোতে বিল্ড স্ট্যাটাস চেক করা হচ্ছে
+    admin_gh = Github(GITHUB_TOKEN)
     try:
-        for a in latest.get_artifacts():
-            result["artifacts"].append({"name": a.name, "url": a.archive_download_url})
-    except GithubException:
-        pass
-    return jsonify(result)
+        builder_repo = admin_gh.get_repo(f"{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}")
+        runs = builder_repo.get_workflow_runs()
+        if not runs.totalCount:
+            return jsonify({"status": "no runs yet"})
+        
+        latest = runs[0]
+        
+        # যদি বিল্ড সফল হয়, আর্টিফ্যাক্ট (APK) লিংক খোঁজা
+        artifacts = []
+        if latest.conclusion == "success":
+            for a in latest.get_artifacts():
+                if a.name == "app-release":
+                    # এই লিংকটি ডাউনলোডের জন্য
+                    artifacts.append({"name": a.name, "url": a.archive_download_url})
+
+        return jsonify({
+            "status": latest.status,
+            "conclusion": latest.conclusion,
+            "artifacts": artifacts
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=True)
