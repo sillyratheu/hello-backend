@@ -46,9 +46,30 @@ jobs:
               sed -i "s/# package.domain = org.example/package.domain = org.shahajjo/g" buildozer.spec
           fi
           
-          # Force accept Android SDK license to prevent prompts
-          echo "android.accept_sdk_license = True" >> buildozer.spec
+          # Python script to robustly ensure SDK license is accepted in buildozer.spec
+          python3 -c "
+          with open('buildozer.spec', 'r') as f:
+              lines = f.readlines()
           
+          new_lines = []
+          license_found = False
+          for line in lines:
+              if 'android.accept_sdk_license' in line:
+                  new_lines.string = 'android.accept_sdk_license = True\n'
+                  new_lines.append('android.accept_sdk_license = True\n')
+                  license_found = True
+              else:
+                  new_lines.append(line)
+          
+          if not license_found:
+              new_lines.append('\nandroid.accept_sdk_license = True\n')
+              
+          with open('buildozer.spec', 'w') as f:
+              f.writelines(new_lines)
+          print('Successfully forced android.accept_sdk_license = True')
+          "
+          
+          # Run buildozer compilation
           buildozer -v android debug
 
       - name: Upload and Overwrite Latest APK Release
