@@ -4,6 +4,9 @@ on:
   repository_dispatch:
     types: [build-apk]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -19,16 +22,10 @@ jobs:
           echo "Cloning user repository from: $USER_REPO"
           git clone "$USER_REPO" user_project
           
-          # Ekhane user er project type onujayi build command run hobe 
-          # (Jemon Python/Android/Gradle build script)
-          echo "Building APK for $APP_NAME..."
-          
-          # Dummy APK generation for testing pipeline (Apni ekhane gradle/buildozer command dite parben)
           mkdir -p output_apk
           echo "Dummy APK content for $APP_NAME" > output_apk/app-debug.apk
 
       - name: Create GitHub Release & Upload APK
-        id: create_release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: apk-${{ github.run_number }}
