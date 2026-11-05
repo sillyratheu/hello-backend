@@ -9,10 +9,10 @@ GITHUB_CLIENT_ID = "Iv23libgx7qvJ0ICF7Te"
 GITHUB_CLIENT_SECRET = "ff274386956b45b6b07318c0428d769c4c442cc8"
 
 GITHUB_OWNER = "sillyratheu"  # Apnar github username
-GITHUB_BUILDER_REPO = "hello-backend"  # Apnar builder repo-r nam
+GITHUB_BUILDER_REPO = "hello-backend"  # Apnar actual builder repo-r nam
 
 
-# --- LANDING PAGE WITH TYPING ANIMATION (Black & White Minimalist Theme) ---
+# --- LANDING PAGE (Black & White Minimalist Theme) ---
 LANDING_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -24,17 +24,11 @@ LANDING_TEMPLATE = """
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Geist', sans-serif; background-color: #000000; color: #ededed; }
-        /* Typing cursor animation */
-        .typing-effect::after {
-            content: '|';
-            animation: blink 1s infinite;
-        }
+        .typing-effect::after { content: '|'; animation: blink 1s infinite; }
         @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
     </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between selection:bg-white selection:text-black">
-    
-    <!-- Navbar -->
     <header class="w-full border-b border-neutral-900 px-6 py-4 flex justify-between items-center max-w-6xl mx-auto">
         <div class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
             <span class="w-2.5 h-2.5 bg-white rounded-full"></span> Shahajjo.
@@ -48,10 +42,9 @@ LANDING_TEMPLATE = """
         </div>
     </header>
 
-    <!-- Hero Section -->
     <main class="flex-grow flex flex-col items-center justify-center text-center px-4 max-w-3xl mx-auto">
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-neutral-800 bg-neutral-950 text-xs text-neutral-400 mb-6">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Cloud-Powered Native APK Compiler
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Put Only Source code to make a native app
         </div>
         
         <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6 h-24 md:h-auto">
@@ -59,7 +52,7 @@ LANDING_TEMPLATE = """
         </h1>
         
         <p class="text-neutral-400 text-sm md:text-base max-w-xl mb-10 font-light leading-relaxed">
-            Transform any GitHub repository into a production-ready native APK automatically via serverless cloud workflows. No local setup required.
+            Transform any GitHub repository into a production-ready native APK automatically via serverless cloud workflows.
         </p>
 
         <div class="flex flex-col sm:flex-row gap-4 w-full justify-center">
@@ -67,24 +60,19 @@ LANDING_TEMPLATE = """
                 <a href="/dashboard" class="bg-white text-black font-medium px-8 py-3.5 rounded-xl hover:bg-neutral-200 transition shadow-lg shadow-white/5">Open Dashboard</a>
             {% else %}
                 <a href="/login" class="bg-white text-black font-medium px-8 py-3.5 rounded-xl hover:bg-neutral-200 transition shadow-lg shadow-white/5 flex items-center justify-center gap-2">
-                    <svg class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
                     Get Started with GitHub
                 </a>
             {% endif %}
         </div>
     </main>
 
-    <!-- Footer -->
     <footer class="w-full border-t border-neutral-900 py-6 text-center text-xs text-neutral-600">
         &copy; 2026 Shahajjo Corporation. All rights reserved.
     </footer>
 
-    <!-- Typing Animation Script -->
     <script>
         const words = ["GitHub Repositories.", "Public Source Code.", "Python & Native Projects."];
         let i = 0;
-        let timer;
-
         function typingEffect() {
             let word = words[i].split("");
             var loopTyping = function() {
@@ -94,11 +82,10 @@ LANDING_TEMPLATE = """
                     setTimeout(deletingEffect, 2000);
                     return false;
                 }
-                timer = setTimeout(loopTyping, 100);
+                setTimeout(loopTyping, 100);
             };
             loopTyping();
         }
-
         function deletingEffect() {
             let word = words[i].split("");
             var loopDeleting = function() {
@@ -106,19 +93,14 @@ LANDING_TEMPLATE = """
                     word.pop();
                     document.getElementById('typing-text').innerHTML = word.join("");
                 } else {
-                    if (words.length > (i + 1)) {
-                        i++;
-                    } else {
-                        i = 0;
-                    }
+                    i = (words.length > (i + 1)) ? i + 1 : 0;
                     setTimeout(typingEffect, 500);
                     return false;
                 }
-                timer = setTimeout(loopDeleting, 50);
+                setTimeout(loopDeleting, 50);
             };
             loopDeleting();
         }
-
         typingEffect();
     </script>
 </body>
@@ -126,7 +108,7 @@ LANDING_TEMPLATE = """
 """
 
 
-# --- DASHBOARD TEMPLATE (Black & White Minimalist Theme) ---
+# --- DASHBOARD TEMPLATE ---
 DASHBOARD_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -140,7 +122,6 @@ DASHBOARD_TEMPLATE = """
 </head>
 <body class="min-h-screen p-6 selection:bg-white selection:text-black">
     <div class="max-w-2xl mx-auto">
-        <!-- Top Bar -->
         <div class="flex justify-between items-center bg-neutral-950 border border-neutral-900 rounded-2xl p-6 mb-6 shadow-2xl">
             <div class="flex items-center gap-4">
                 <img src="{{ user.avatar_url }}" class="w-11 h-11 rounded-full border border-neutral-800">
@@ -155,8 +136,11 @@ DASHBOARD_TEMPLATE = """
             </div>
         </div>
         
-        <!-- Build Card -->
         <div class="bg-neutral-950 border border-neutral-900 rounded-2xl p-8 shadow-2xl">
+            <div class="mb-6 p-3 rounded-xl bg-neutral-900/50 border border-neutral-800 text-xs text-emerald-400 font-medium">
+                ℹ️ Put Only Source code to make a native app
+            </div>
+
             <h3 class="text-lg font-bold text-white mb-1">Compiler Control Center</h3>
             <p class="text-neutral-500 text-xs mb-6">Select your personal repository or enter a public link to start compilation.</p>
             
@@ -222,7 +206,6 @@ def auth_callback():
     
     user = requests.get("https://api.github.com/user", headers={"Authorization": f"Bearer {token}"}).json()
     
-    # Save user details and token securely in Flask session (persistent login)
     session["user"] = user
     session["access_token"] = token
     return redirect(url_for("home"))
