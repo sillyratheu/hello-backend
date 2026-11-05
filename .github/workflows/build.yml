@@ -4,6 +4,9 @@ on:
   repository_dispatch:
     types: [build-apk]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -43,15 +46,18 @@ jobs:
               sed -i "s/# package.domain = org.example/package.domain = org.shahajjo/g" buildozer.spec
           fi
           
-          # Automatically accept Android SDK licenses inside buildozer.spec
-          sed -i "s/#android.accept_sdk_license = False/android.accept_sdk_license = True/g" buildozer.spec
-          sed -i "s/android.accept_sdk_license = False/android.accept_sdk_license = True/g" buildozer.spec
-
-          # Run buildozer normally without 'yes |' to prevent Broken pipe errors
+          # Force accept Android SDK license to prevent prompts
+          echo "android.accept_sdk_license = True" >> buildozer.spec
+          
           buildozer -v android debug
 
-      - name: Upload APK as GitHub Artifact
-        uses: actions/upload-artifact@v4
+      - name: Upload and Overwrite Latest APK Release
+        uses: softprops/action-gh-release@v2
         with:
-          name: compiled-app-apk
-          path: user_project/bin/*.apk
+          tag_name: latest-build
+          name: "Shahajjo Cloud Compiled APK"
+          files: user_project/bin/*.apk
+          overwrite: true
+          body: "Auto-compiled APK generated via Shahajjo platform."
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
