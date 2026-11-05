@@ -1,341 +1,220 @@
 import os
-from flask import Flask, redirect, render_template_string, request, session, url_for
 import requests
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session
+from github import Github, GithubException
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-change-me")
 
-GITHUB_CLIENT_ID = "Iv23libgx7qvJ0ICF7Te"
-GITHUB_CLIENT_SECRET = "ff274386956b45b6b07318c0428d769c4c442cc8"
+GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
+GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
+GITHUB_BUILDER_OWNER = os.getenv("GITHUB_BUILDER_OWNER")
+GITHUB_BUILDER_REPO = os.getenv("GITHUB_BUILDER_REPO")
 
-GITHUB_OWNER = "sillyratheu"
-GITHUB_BUILDER_REPO = "hello-backend"
-
-
-LANDING_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shahajjo - Cloud APK Builder</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Geist', sans-serif; background-color: #000000; color: #ededed; }
-        .typing-effect::after { content: '|'; animation: blink 1s infinite; }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-    </style>
-</head>
-<body class="min-h-screen flex flex-col justify-between selection:bg-white selection:text-black">
-    <header class="w-full border-b border-neutral-900 px-6 py-4 flex justify-between items-center max-w-6xl mx-auto">
-        <div class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-            <span class="w-2.5 h-2.5 bg-white rounded-full"></span> Shahajjo.
-        </div>
-        <div>
-            {% if user %}
-                <a href="/dashboard" class="text-xs uppercase tracking-widest bg-white text-black font-semibold px-4 py-2 rounded-full hover:bg-neutral-200 transition">Dashboard</a>
-            {% else %}
-                <a href="/login" class="text-xs uppercase tracking-widest border border-neutral-800 text-neutral-300 font-medium px-4 py-2 rounded-full hover:border-white transition">Sign In</a>
-            {% endif %}
-        </div>
-    </header>
-    <main class="flex-grow flex flex-col items-center justify-center text-center px-4 max-w-3xl mx-auto">
-        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-neutral-800 bg-neutral-950 text-xs text-neutral-400 mb-6">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Put Only Source code to make a native app
-        </div>
-        <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6 h-24 md:h-auto">
-            Build Android Apps from <br><span id="typing-text" class="text-neutral-400 typing-effect"></span>
-        </h1>
-        <p class="text-neutral-400 text-sm md:text-base max-w-xl mb-10 font-light leading-relaxed">
-            Transform any GitHub repository into a production-ready native APK automatically via serverless cloud workflows.
-        </p>
-        <div>
-            {% if user %}
-                <a href="/dashboard" class="bg-white text-black font-medium px-8 py-3.5 rounded-xl hover:bg-neutral-200 transition shadow-lg">Open Dashboard</a>
-            {% else %}
-                <a href="/login" class="bg-white text-black font-medium px-8 py-3.5 rounded-xl hover:bg-neutral-200 transition shadow-lg">Get Started with GitHub</a>
-            {% endif %}
-        </div>
-    </main>
-    <footer class="w-full border-t border-neutral-900 py-6 text-center text-xs text-neutral-600">
-        &copy; 2026 Shahajjo Corporation. All rights reserved.
-    </footer>
-    <script>
-        const words = ["GitHub Repositories.", "Public Source Code.", "Python & Native Projects."];
-        let i = 0;
-        function typingEffect() {
-            let word = words[i].split("");
-            var loopTyping = function() {
-                if (word.length > 0) {
-                    document.getElementById('typing-text').innerHTML += word.shift();
-                } else {
-                    setTimeout(deletingEffect, 2000);
-                    return false;
-                }
-                setTimeout(loopTyping, 100);
-            };
-            loopTyping();
-        }
-        function deletingEffect() {
-            let word = words[i].split("");
-            var loopDeleting = function() {
-                if (word.length > 0) {
-                    word.pop();
-                    document.getElementById('typing-text').innerHTML = word.join("");
-                } else {
-                    i = (words.length > (i + 1)) ? i + 1 : 0;
-                    setTimeout(typingEffect, 500);
-                    return false;
-                }
-                setTimeout(loopDeleting, 50);
-            };
-            loopDeleting();
-        }
-        typingEffect();
-    </script>
-</body>
-</html>
-"""
-
-DASHBOARD_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard - Shahajjo</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Geist', sans-serif; background-color: #000000; color: #ededed; }</style>
-</head>
-<body class="min-h-screen p-6 selection:bg-white selection:text-black">
-    <div class="max-w-2xl mx-auto">
-        <div class="flex justify-between items-center bg-neutral-950 border border-neutral-900 rounded-2xl p-6 mb-6 shadow-2xl">
-            <div class="flex items-center gap-4">
-                <img src="{{ user.avatar_url }}" class="w-11 h-11 rounded-full border border-neutral-800">
-                <div>
-                    <h2 class="text-sm font-semibold text-white">@{{ user.login }}</h2>
-                    <p class="text-xs text-neutral-500">Active Session Secured</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-3">
-                <a href="/" class="bg-neutral-900 text-neutral-300 px-4 py-2 rounded-xl text-xs font-medium border border-neutral-800">Home</a>
-                <a href="/logout" class="bg-neutral-900 text-red-400 px-4 py-2 rounded-xl text-xs font-medium border border-neutral-800">Logout</a>
-            </div>
-        </div>
-        <div class="bg-neutral-950 border border-neutral-900 rounded-2xl p-8 shadow-2xl">
-            <div class="mb-6 p-3 rounded-xl bg-neutral-900/50 border border-neutral-800 text-xs text-emerald-400 font-medium">
-                ℹ️ Put Only Source code to make a native app
-            </div>
-            <h3 class="text-lg font-bold text-white mb-1">Compiler Control Center</h3>
-            <p class="text-neutral-500 text-xs mb-6">Select your personal repository or enter a public link to start compilation.</p>
-            <form action="/start-build" method="POST" class="space-y-5">
-                <div>
-                    <label class="block text-xs font-medium text-neutral-400 mb-2 uppercase tracking-wider">Select Your Repository</label>
-                    <select name="selected_repo" class="w-full bg-black border border-neutral-800 rounded-xl p-3.5 text-sm text-neutral-200 focus:outline-none focus:border-white">
-                        <option value="">-- Choose from your repositories --</option>
-                        {% for repo in repos %}
-                            <option value="{{ repo.clone_url }}">{{ repo.full_name }}</option>
-                        {% endfor %}
-                    </select>
-                </div>
-                <div class="text-center text-xs text-neutral-600 font-semibold">— OR —</div>
-                <div>
-                    <label class="block text-xs font-medium text-neutral-400 mb-2 uppercase tracking-wider">Public Repository URL</label>
-                    <input type="url" name="custom_repo" placeholder="https://github.com/username/repository" class="w-full bg-black border border-neutral-800 rounded-xl p-3.5 text-sm text-neutral-200 focus:outline-none focus:border-white">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-neutral-400 mb-2 uppercase tracking-wider">App Name</label>
-                    <input type="text" name="app_name" required placeholder="My Awesome App" class="w-full bg-black border border-neutral-800 rounded-xl p-3.5 text-sm text-neutral-200 focus:outline-none focus:border-white">
-                </div>
-                <button type="submit" class="w-full bg-white text-black font-semibold py-3.5 px-4 rounded-xl hover:bg-neutral-200 transition text-sm cursor-pointer mt-2">
-                    Initialize Cloud Build 🚀
-                </button>
-            </form>
-        </div>
-    </div>
-</body>
-</html>
-"""
-
-BUILD_STATUS_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Build Status - Shahajjo</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Geist', sans-serif; background-color: #000000; color: #ededed; }</style>
-    {% if status != 'completed' %}
-    <meta http-equiv="refresh" content="5">
-    {% endif %}
-</head>
-<body class="min-h-screen p-6 selection:bg-white selection:text-black">
-    <div class="max-w-2xl mx-auto">
-        <div class="bg-neutral-950 border border-neutral-900 rounded-2xl p-8 shadow-2xl">
-            <h2 class="text-xl font-bold text-white mb-2">Build Pipeline Status</h2>
-            <p class="text-neutral-400 text-xs mb-6">Target App: <b class="text-white">{{ app_name }}</b></p>
-            
-            <div class="bg-black border border-neutral-800 rounded-xl p-4 mb-6">
-                <p class="text-xs text-neutral-400 mb-1 uppercase tracking-wider">Build Status:</p>
-                <p class="text-base font-semibold {% if status == 'completed' and conclusion == 'success' %}text-emerald-400{% elif status == 'completed' %}text-red-400{% else %}text-amber-400 animate-pulse{% endif %}">
-                    {{ status | upper }} {% if conclusion %}({{ conclusion }}){% else %}(in_progress){% endif %}
-                </p>
-            </div>
-
-            <div class="mb-6 bg-black border border-neutral-800 rounded-xl p-4">
-                <p class="text-xs text-neutral-400 mb-2 uppercase tracking-wider">Pipeline Activity Logs:</p>
-                <div class="bg-neutral-950 p-3 rounded-lg border border-neutral-900 text-xs font-mono text-neutral-300 overflow-x-auto">
-                    {% if status == 'in_progress' or status == 'queued' %}
-                        <p class="text-amber-400">⏳ Building your app in cloud runner... Please wait, page will refresh automatically.</p>
-                    {% elif status == 'completed' and conclusion == 'success' %}
-                        <p class="text-emerald-400">✅ Build completed successfully and real APK is ready!</p>
-                    {% else %}
-                        <p class="text-red-400">❌ Build failed. Please ensure your repository contains valid Python source code or build configuration.</p>
-                    {% endif %}
-                </div>
-            </div>
-
-            {% if status == 'completed' and conclusion == 'success' and download_url %}
-                <div class="mb-6 p-4 bg-emerald-950/30 border border-emerald-900/50 rounded-xl text-center">
-                    <p class="text-xs text-emerald-300 mb-3">Your real APK file is ready for download!</p>
-                    <a href="{{ download_url }}" class="inline-block bg-emerald-500 text-black font-semibold px-6 py-3 rounded-xl text-sm hover:bg-emerald-400 transition shadow-lg">
-                        Download APK 📦
-                    </a>
-                </div>
-            {% else %}
-                <div class="mb-6 p-4 bg-neutral-900/50 border border-neutral-800 rounded-xl text-center">
-                    <p class="text-xs text-neutral-400">Compilation in progress... Download button will appear automatically only when the build is successfully completed.</p>
-                </div>
-            {% endif %}
-
-            <div class="text-center">
-                <a href="/dashboard" class="inline-block bg-white text-black font-semibold px-6 py-3 rounded-xl text-xs hover:bg-neutral-200 transition">
-                    Back to Dashboard
-                </a>
-            </div>
-        </div>
-    </div>
-</body>
-</html>
-"""
-
-
+# ---------- Landing ----------
 @app.route("/")
-def home():
-    return render_template_string(LANDING_TEMPLATE, user=session.get("user"))
+def landing():
+    return render_template("landing.html")
 
+# ---------- Auth ----------
 @app.route("/login")
 def login():
-    return redirect(f"https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&scope=repo,workflow")
+    # store where to go after login
+    session["next"] = request.args.get("next", "select")
+    url = (
+        "https://github.com/login/oauth/authorize"
+        f"?client_id={GITHUB_CLIENT_ID}"
+        "&scope=repo,workflow"
+    )
+    return redirect(url)
 
-@app.route("/auth/callback")
-def auth_callback():
+@app.route("/callback")
+def callback():
     code = request.args.get("code")
     if not code:
-        return "Error", 400
-    res = requests.post("https://github.com/login/oauth/access_token", json={
-        "client_id": GITHUB_CLIENT_ID,
-        "client_secret": GITHUB_CLIENT_SECRET,
-        "code": code
-    }, headers={"Accept": "application/json"}).json()
-    token = res.get("access_token")
-    if not token:
-        return "Token Error", 400
-    user = requests.get("https://api.github.com/user", headers={"Authorization": f"Bearer {token}"}).json()
-    session["user"] = user
-    session["access_token"] = token
-    return redirect(url_for("home"))
+        return "Authorization failed.", 400
 
-@app.route("/dashboard")
-def dashboard():
-    if "user" not in session:
-        return redirect(url_for("home"))
-    repos = requests.get("https://api.github.com/user/repos?per_page=100&sort=updated", headers={"Authorization": f"Bearer {session['access_token']}"}).json()
-    return render_template_string(DASHBOARD_TEMPLATE, user=session["user"], repos=repos if isinstance(repos, list) else [])
-
-@app.route("/start-build", methods=["POST"])
-def start_build():
-    if "user" not in session:
-        return redirect(url_for("home"))
-    
-    target_repo = request.form.get("custom_repo") or request.form.get("selected_repo")
-    app_name = request.form.get("app_name")
-    
-    if not target_repo:
-        return "Error: Please select a repository or enter a valid public repo link!", 400
-
-    GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
-    if not GITHUB_TOKEN:
-        return "Error: GITHUB_TOKEN environment variable is not set on Render!", 500
-
-    dispatch_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_BUILDER_REPO}/dispatches"
-    headers = {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github+json",
-        "X-GitHub-Api-Version": "2022-11-28"
-    }
-    payload = {
-        "event_type": "build-apk",
-        "client_payload": {
-            "repo_url": target_repo,
-            "app_name": app_name,
-            "user": session["user"]["login"]
-        }
-    }
-    
-    response = requests.post(dispatch_url, json=payload, headers=headers)
-    
-    if response.status_code == 204:
-        return redirect(url_for("build_status", app_name=app_name))
-    else:
-        return f"Failed to trigger build: {response.status_code} - {response.text}", 500
-
-@app.route("/build-status")
-def build_status():
-    if "user" not in session:
-        return redirect(url_for("home"))
-    
-    app_name = request.args.get("app_name", "My App")
-    GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
-    headers = {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github+json"
-    }
-    
-    runs_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_BUILDER_REPO}/actions/runs?per_page=1"
-    runs_res = requests.get(runs_url, headers=headers).json()
-    
-    status = "queued"
-    conclusion = None
-    
-    if "workflow_runs" in runs_res and len(runs_res["workflow_runs"]) > 0:
-        latest_run = runs_res["workflow_runs"][0]
-        status = latest_run.get("status")
-        conclusion = latest_run.get("conclusion")
-
-    download_url = None
-    if status == "completed" and conclusion == "success":
-        release_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_BUILDER_REPO}/releases/tags/latest-build"
-        release_res = requests.get(release_url, headers=headers).json()
-        if "assets" in release_res and len(release_res["assets"]) > 0:
-            download_url = release_res["assets"][0].get("browser_download_url")
-
-    return render_template_string(
-        BUILD_STATUS_TEMPLATE, 
-        status=status, 
-        conclusion=conclusion, 
-        download_url=download_url, 
-        app_name=app_name
+    resp = requests.post(
+        "https://github.com/login/oauth/access_token",
+        headers={"Accept": "application/json"},
+        data={
+            "client_id": GITHUB_CLIENT_ID,
+            "client_secret": GITHUB_CLIENT_SECRET,
+            "code": code,
+        },
     )
+    token = resp.json().get("access_token")
+    if not token:
+        return "Sign in failed. Please try again.", 400
+
+    session["token"] = token
+    return redirect(url_for("select_repo"))
 
 @app.route("/logout")
 def logout():
     session.clear()
-    return redirect(url_for("home"))
+    return redirect(url_for("landing"))
+
+# ---------- Repo select ----------
+@app.route("/select")
+def select_repo():
+    if "token" not in session:
+        return redirect(url_for("login"))
+    return render_template("select_repo.html")
+
+@app.route("/api/repos")
+def api_repos():
+    if "token" not in session:
+        return jsonify({"error": "not signed in"}), 401
+    gh = Github(session["token"])
+    user = gh.get_user()
+    repos = [
+        {"name": r.name, "full_name": r.full_name, "private": r.private, "url": r.html_url}
+        for r in user.get_repos()
+    ]
+    return jsonify(repos)
+
+@app.route("/api/create-project", methods=["POST"])
+def create_project():
+    """Creates a new repo for the user by copying the builder template."""
+    if "token" not in session:
+        return jsonify({"error": "not signed in"}), 401
+
+    data = request.json or {}
+    repo_name = data.get("repo_name", "").strip()
+    if not repo_name:
+        return jsonify({"error": "repo name required"}), 400
+
+    gh = Github(session["token"])
+    user = gh.get_user()
+    source = gh.get_repo(f"{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}")
+
+    try:
+        new_repo = user.create_repo(repo_name, auto_init=False)
+    except GithubException as e:
+        if e.status == 422:
+            new_repo = user.get_repo(repo_name)
+        else:
+            return jsonify({"error": "Could not create project."}), 400
+
+    copied = 0
+    try:
+        items = source.get_contents("")
+        while items:
+            item = items.pop(0)
+            if item.type == "file":
+                try:
+                    new_repo.create_file(item.path, f"Import {item.path}", item.decoded_content)
+                    copied += 1
+                except GithubException:
+                    pass
+            elif item.type == "dir":
+                items.extend(source.get_contents(item.path))
+    except GithubException:
+        pass
+
+    return jsonify({"repo": new_repo.full_name, "copied": copied})
+
+# ---------- Editor ----------
+@app.route("/editor")
+def editor():
+    if "token" not in session:
+        return redirect(url_for("login"))
+    repo = request.args.get("repo", "")
+    if not repo:
+        return redirect(url_for("select_repo"))
+    return render_template("editor.html", repo=repo)
+
+# ---------- File APIs ----------
+@app.route("/api/file", methods=["GET"])
+def get_file():
+    if "token" not in session:
+        return jsonify({"error": "not signed in"}), 401
+    repo_full = request.args.get("repo")
+    path = request.args.get("path", "lib/main.dart")
+    gh = Github(session["token"])
+    repo = gh.get_repo(repo_full)
+    try:
+        content = repo.get_contents(path)
+        return jsonify({"content": content.decoded_content.decode("utf-8")})
+    except GithubException:
+        return jsonify({"content": None})
+
+@app.route("/api/file", methods=["POST"])
+def save_file():
+    if "token" not in session:
+        return jsonify({"error": "not signed in"}), 401
+    data = request.json
+    repo_full = data["repo"]
+    path = data["path"]
+    content = data["content"]
+    gh = Github(session["token"])
+    repo = gh.get_repo(repo_full)
+    try:
+        existing = repo.get_contents(path)
+        repo.update_file(path, f"Update {path}", content, existing.sha)
+    except GithubException:
+        repo.create_file(path, f"Create {path}", content)
+    return jsonify({"status": "saved"})
+
+# ---------- Build ----------
+@app.route("/api/build", methods=["POST"])
+def build():
+    if "token" not in session:
+        return jsonify({"error": "not signed in"}), 401
+    data = request.json
+    repo_full = data["repo"]
+    branch = data.get("branch", "main")
+    gh = Github(session["token"])
+    repo = gh.get_repo(repo_full)
+
+    workflow_path = ".github/workflows/build.yml"
+    workflow_content = open("workflow_template.yml").read()
+    try:
+        existing = repo.get_contents(workflow_path)
+        repo.update_file(workflow_path, "Update build workflow", workflow_content, existing.sha)
+    except GithubException:
+        repo.create_file(workflow_path, "Add build workflow", workflow_content)
+
+    url = f"https://api.github.com/repos/{repo_full}/actions/workflows/build.yml/dispatches"
+    r = requests.post(
+        url,
+        headers={
+            "Authorization": f"Bearer {session['token']}",
+            "Accept": "application/vnd.github+json",
+        },
+        json={"ref": branch},
+    )
+    if r.status_code not in (204, 201):
+        return jsonify({"error": "Build could not be started."}), 400
+    return jsonify({"status": "building"})
+
+@app.route("/api/build-status")
+def build_status():
+    if "token" not in session:
+        return jsonify({"error": "not signed in"}), 401
+    repo_full = request.args.get("repo")
+    gh = Github(session["token"])
+    repo = gh.get_repo(repo_full)
+    runs = repo.get_workflow_runs()
+    if not runs.totalCount:
+        return jsonify({"status": "no runs"})
+    latest = runs[0]
+    result = {
+        "status": latest.status,
+        "conclusion": latest.conclusion,
+        "url": latest.html_url,
+        "artifacts": [],
+    }
+    try:
+        for a in latest.get_artifacts():
+            result["artifacts"].append({"name": a.name, "url": a.archive_download_url})
+    except GithubException:
+        pass
+    return jsonify(result)
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=True)
