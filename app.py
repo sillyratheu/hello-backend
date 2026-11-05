@@ -12,7 +12,6 @@ GITHUB_OWNER = "sillyratheu"
 GITHUB_BUILDER_REPO = "hello-backend"
 
 
-# --- LANDING PAGE ---
 LANDING_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -37,7 +36,6 @@ LANDING_TEMPLATE = """
             {% endif %}
         </div>
     </header>
-
     <main class="flex-grow flex flex-col items-center justify-center text-center px-4 max-w-3xl mx-auto">
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-neutral-800 bg-neutral-950 text-xs text-neutral-400 mb-6">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Put Only Source code to make a native app
@@ -45,9 +43,6 @@ LANDING_TEMPLATE = """
         <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6">
             Build Android Apps from <br><span class="text-neutral-400">GitHub Repositories.</span>
         </h1>
-        <p class="text-neutral-400 text-sm md:text-base max-w-xl mb-10 font-light">
-            Transform any repository into a production-ready native APK automatically via serverless cloud workflows.
-        </p>
         <div>
             {% if user %}
                 <a href="/dashboard" class="bg-white text-black font-medium px-8 py-3.5 rounded-xl hover:bg-neutral-200 transition shadow-lg">Open Dashboard</a>
@@ -56,7 +51,6 @@ LANDING_TEMPLATE = """
             {% endif %}
         </div>
     </main>
-
     <footer class="w-full border-t border-neutral-900 py-6 text-center text-xs text-neutral-600">
         &copy; 2026 Shahajjo Corporation. All rights reserved.
     </footer>
@@ -64,8 +58,6 @@ LANDING_TEMPLATE = """
 </html>
 """
 
-
-# --- DASHBOARD TEMPLATE ---
 DASHBOARD_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -92,15 +84,12 @@ DASHBOARD_TEMPLATE = """
                 <a href="/logout" class="bg-neutral-900 text-red-400 px-4 py-2 rounded-xl text-xs font-medium border border-neutral-800">Logout</a>
             </div>
         </div>
-        
         <div class="bg-neutral-950 border border-neutral-900 rounded-2xl p-8 shadow-2xl">
             <div class="mb-6 p-3 rounded-xl bg-neutral-900/50 border border-neutral-800 text-xs text-emerald-400 font-medium">
                 ℹ️ Put Only Source code to make a native app
             </div>
-
             <h3 class="text-lg font-bold text-white mb-1">Compiler Control Center</h3>
             <p class="text-neutral-500 text-xs mb-6">Select your personal repository or enter a public link to start compilation.</p>
-            
             <form action="/start-build" method="POST" class="space-y-5">
                 <div>
                     <label class="block text-xs font-medium text-neutral-400 mb-2 uppercase tracking-wider">Select Your Repository</label>
@@ -130,8 +119,6 @@ DASHBOARD_TEMPLATE = """
 </html>
 """
 
-
-# --- BUILD STATUS & LOGS TEMPLATE ---
 BUILD_STATUS_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -142,7 +129,9 @@ BUILD_STATUS_TEMPLATE = """
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>body { font-family: 'Geist', sans-serif; background-color: #000000; color: #ededed; }</style>
-    <meta http-equiv="refresh" content="5"> <!-- Auto refresh every 5 seconds to check status & logs -->
+    {% if status != 'completed' %}
+    <meta http-equiv="refresh" content="5">
+    {% endif %}
 </head>
 <body class="min-h-screen p-6 selection:bg-white selection:text-black">
     <div class="max-w-2xl mx-auto">
@@ -151,31 +140,41 @@ BUILD_STATUS_TEMPLATE = """
             <p class="text-neutral-400 text-xs mb-6">Target App: <b class="text-white">{{ app_name }}</b></p>
             
             <div class="bg-black border border-neutral-800 rounded-xl p-4 mb-6">
-                <p class="text-xs text-neutral-400 mb-1 uppercase tracking-wider">Current Status:</p>
-                <p class="text-base font-semibold {% if status == 'completed' %}text-emerald-400{% else %}text-amber-400 animate-pulse{% endif %}">
-                    {{ status | upper }} ({{ conclusion or 'in_progress' }})
+                <p class="text-xs text-neutral-400 mb-1 uppercase tracking-wider">Build Status:</p>
+                <p class="text-base font-semibold {% if status == 'completed' and conclusion == 'success' %}text-emerald-400{% elif status == 'completed' %}text-red-400{% else %}text-amber-400 animate-pulse{% endif %}">
+                    {{ status | upper }} {% if conclusion %}({{ conclusion }}){% else %}(in_progress){% endif %}
                 </p>
             </div>
 
-            {% if download_url %}
+            <div class="mb-6 bg-black border border-neutral-800 rounded-xl p-4">
+                <p class="text-xs text-neutral-400 mb-2 uppercase tracking-wider">Pipeline Activity Logs:</p>
+                <div class="bg-neutral-950 p-3 rounded-lg border border-neutral-900 text-xs font-mono text-neutral-300 overflow-x-auto">
+                    {% if status == 'in_progress' or status == 'queued' %}
+                        <p class="text-amber-400">⏳ Building your app in cloud runner... Please wait, page will refresh automatically.</p>
+                    {% elif status == 'completed' and conclusion == 'success' %}
+                        <p class="text-emerald-400">✅ Build completed successfully and real APK is ready!</p>
+                    {% else %}
+                        <p class="text-red-400">❌ Build failed or encountered an error. Please check your repository or build logs.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% if status == 'completed' and conclusion == 'success' and download_url %}
                 <div class="mb-6 p-4 bg-emerald-950/30 border border-emerald-900/50 rounded-xl text-center">
-                    <p class="text-xs text-emerald-300 mb-3">Build completed successfully! Your APK is ready.</p>
+                    <p class="text-xs text-emerald-300 mb-3">Your real APK file is ready for download!</p>
                     <a href="{{ download_url }}" class="inline-block bg-emerald-500 text-black font-semibold px-6 py-3 rounded-xl text-sm hover:bg-emerald-400 transition shadow-lg">
                         Download APK 📦
                     </a>
                 </div>
             {% else %}
                 <div class="mb-6 p-4 bg-neutral-900/50 border border-neutral-800 rounded-xl text-center">
-                    <p class="text-xs text-neutral-400">Building in progress... Page will update automatically.</p>
+                    <p class="text-xs text-neutral-400">Compilation in progress... Download button will appear automatically only when the build is successfully completed.</p>
                 </div>
             {% endif %}
 
-            <div class="flex gap-4">
-                <a href="https://github.com/{{ owner }}/{{ repo }}/actions" target="_blank" class="flex-1 bg-neutral-900 text-center text-neutral-300 font-medium py-3 rounded-xl text-xs hover:bg-neutral-800 border border-neutral-800 transition">
-                    View Live GitHub Logs 🖥️
-                </a>
-                <a href="/dashboard" class="bg-white text-black font-semibold px-6 py-3 rounded-xl text-xs hover:bg-neutral-200 transition">
-                    Dashboard
+            <div class="text-center">
+                <a href="/dashboard" class="inline-block bg-white text-black font-semibold px-6 py-3 rounded-xl text-xs hover:bg-neutral-200 transition">
+                    Back to Dashboard
                 </a>
             </div>
         </div>
@@ -189,11 +188,9 @@ BUILD_STATUS_TEMPLATE = """
 def home():
     return render_template_string(LANDING_TEMPLATE, user=session.get("user"))
 
-
 @app.route("/login")
 def login():
     return redirect(f"https://github.com/login/oauth/authorize?client_id={GITHUB_CLIENT_ID}&scope=repo,workflow")
-
 
 @app.route("/auth/callback")
 def auth_callback():
@@ -213,14 +210,12 @@ def auth_callback():
     session["access_token"] = token
     return redirect(url_for("home"))
 
-
 @app.route("/dashboard")
 def dashboard():
     if "user" not in session:
         return redirect(url_for("home"))
     repos = requests.get("https://api.github.com/user/repos?per_page=100&sort=updated", headers={"Authorization": f"Bearer {session['access_token']}"}).json()
     return render_template_string(DASHBOARD_TEMPLATE, user=session["user"], repos=repos if isinstance(repos, list) else [])
-
 
 @app.route("/start-build", methods=["POST"])
 def start_build():
@@ -259,7 +254,6 @@ def start_build():
     else:
         return f"Failed to trigger build: {response.status_code} - {response.text}", 500
 
-
 @app.route("/build-status")
 def build_status():
     if "user" not in session:
@@ -272,7 +266,6 @@ def build_status():
         "Accept": "application/vnd.github+json"
     }
     
-    # Fetch latest workflow runs to show real-time status
     runs_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_BUILDER_REPO}/actions/runs?per_page=1"
     runs_res = requests.get(runs_url, headers=headers).json()
     
@@ -284,30 +277,26 @@ def build_status():
         status = latest_run.get("status")
         conclusion = latest_run.get("conclusion")
 
-    # Fetch latest release to grab download link if completed
-    release_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_BUILDER_REPO}/releases/latest"
-    release_res = requests.get(release_url, headers=headers).json()
-    
     download_url = None
-    if "assets" in release_res and len(release_res["assets"]) > 0:
-        download_url = release_res["assets"][0].get("browser_download_url")
+    # Shudhumatro jokhon build puro complete ebong success hobe, tokhoni release theke download link anbe
+    if status == "completed" and conclusion == "success":
+        release_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_BUILDER_REPO}/releases/latest"
+        release_res = requests.get(release_url, headers=headers).json()
+        if "assets" in release_res and len(release_res["assets"]) > 0:
+            download_url = release_res["assets"][0].get("browser_download_url")
 
     return render_template_string(
         BUILD_STATUS_TEMPLATE, 
         status=status, 
         conclusion=conclusion, 
         download_url=download_url, 
-        app_name=app_name, 
-        owner=GITHUB_OWNER, 
-        repo=GITHUB_BUILDER_REPO
+        app_name=app_name
     )
-
 
 @app.route("/logout")
 def logout():
     session.clear()
     return redirect(url_for("home"))
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
