@@ -2,64 +2,107 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Editor — Shahajjo Studio</title>
   <link rel="stylesheet" href="/static/style.css">
-  <!-- Monaco Editor Loader -->
   <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
   
   <style>
-    /* Editor Page Specific Styles */
-    body, html { height: 100%; overflow: hidden; margin: 0; padding: 0; background: #0a0a0a; color: #fff; font-family: monospace; }
+    body, html { height: 100%; overflow: hidden; margin: 0; padding: 0; background: #0a0a0a; color: #fff; font-family: sans-serif; }
     
+    /* Topbar Layout for Mobile */
     .topbar {
       display: flex;
-      align-items: center;
-      padding: 10px 15px;
+      flex-direction: column;
       background: #000;
       border-bottom: 1px solid #333;
-      height: 50px;
-      box-sizing: border-box;
+      padding: 10px;
     }
-    .brand { font-weight: bold; letter-spacing: 2px; margin-right: 20px; color: #888; }
-    .repo-name { font-size: 14px; color: #fff; margin-right: auto; }
     
-    .controls button {
+    .topbar-row1 {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    
+    .brand { font-weight: bold; letter-spacing: 2px; color: #888; font-size: 14px; }
+    .repo-name { font-size: 12px; color: #4ade80; font-weight: bold; }
+    
+    .topbar-row2 {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .topbar-row2 button {
+      flex: 1;
       background: transparent;
       border: 1px solid #fff;
       color: #fff;
-      padding: 6px 12px;
-      margin-left: 8px;
+      padding: 8px 4px;
       cursor: pointer;
       font-size: 12px;
+      font-weight: bold;
       text-transform: uppercase;
       transition: 0.2s;
+      border-radius: 4px;
     }
-    .controls button:hover { background: #fff; color: #000; }
+    
+    .topbar-row2 button:hover, .topbar-row2 button.active {
+      background: #fff;
+      color: #000;
+    }
+    
+    #btn-edit.active { background: #facc15; color: #000; border-color: #facc15; }
     
     .status-badge {
       font-size: 12px;
-      color: #4ade80;
-      margin-right: 15px;
+      color: #60a5fa;
+      text-align: center;
+      margin-top: 8px;
       font-weight: bold;
+      min-height: 16px;
     }
 
-    /* Split View Container */
+    /* Main Container */
     .main-container {
       display: flex;
       flex-direction: column;
-      height: calc(100vh - 50px);
+      height: calc(100vh - 110px); /* Adjust based on topbar height */
     }
     
     .editor-wrapper {
-      flex: 1; /* Takes up remaining space */
-      min-height: 40vh;
+      flex: 1;
       border-bottom: 2px solid #333;
+      position: relative;
+    }
+
+    /* Lock Overlay */
+    #editor-lock-overlay {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.4);
+      z-index: 10;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding-top: 20px;
+      display: none; /* Hidden by default */
+    }
+    
+    #editor-lock-overlay span {
+      background: #333;
+      color: #fff;
+      padding: 5px 15px;
+      border-radius: 20px;
+      font-size: 12px;
+      border: 1px solid #555;
     }
 
     #editor { width: 100%; height: 100%; }
 
-    /* Output Terminal */
+    /* Output Console */
     .output-wrapper {
       height: 35vh;
       background: #050505;
@@ -80,17 +123,18 @@
     
     .output-header button {
       background: none; border: none; color: #888; cursor: pointer;
+      font-size: 12px;
     }
     .output-header button:hover { color: #fff; }
 
     #output {
       flex: 1;
-      padding: 15px;
+      padding: 10px;
       overflow-y: auto;
       color: #ccc;
       font-family: 'Courier New', Courier, monospace;
-      font-size: 13px;
-      line-height: 1.5;
+      font-size: 12px;
+      line-height: 1.4;
       white-space: pre-wrap;
     }
 
@@ -109,6 +153,9 @@
       border-radius: 4px;
       text-transform: uppercase;
       transition: 0.2s;
+      text-align: center;
+      width: 100%;
+      box-sizing: border-box;
     }
     .download-btn:hover { background: #ccc; }
   </style>
@@ -117,15 +164,20 @@
 
   <!-- Top Navigation Bar -->
   <div class="topbar">
-    <div class="brand">SHAHAJJO STUDIO</div>
-    <div class="repo-name">{{ repo }}</div>
-    <div class="controls">
-      <span id="status" class="status-badge">Ready</span>
-      <button onclick="saveFile()">Save Code</button>
+    <div class="topbar-row1">
+      <div class="brand">SHAHAJJO STUDIO</div>
+      <div class="repo-name">{{ repo }}</div>
+    </div>
+    
+    <div class="topbar-row2">
+      <button id="btn-edit" onclick="toggleEdit()">Edit</button>
+      <button onclick="saveFile()">Save</button>
       <button onclick="buildApp()">Build APK</button>
-      <button onclick="checkStatus()">Check Status</button>
+      <button onclick="checkStatus()">Status</button>
       <button onclick="location.href='/select'">Projects</button>
     </div>
+    
+    <div id="status" class="status-badge">Ready (Read-Only)</div>
   </div>
 
   <!-- Main Editor & Output Area -->
@@ -133,6 +185,9 @@
     <!-- Code Editor -->
     <div class="editor-wrapper">
       <div id="editor"></div>
+      <div id="editor-lock-overlay">
+        <span>🔒 Read-Only Mode. Click 'Edit' to modify.</span>
+      </div>
     </div>
 
     <!-- Output Console -->
@@ -141,22 +196,29 @@
         <span>CONSOLE OUTPUT</span>
         <button onclick="document.getElementById('output').innerHTML = ''">Clear</button>
       </div>
-      <div id="output">> System initialized. Ready to build.</div>
+      <div id="output">> System initialized. Click 'Build APK' to start.</div>
     </div>
   </div>
 
   <script>
     const REPO = "{{ repo }}";
     let editor;
+    let isEditable = false; // ডিফল্টভাবে লক থাকবে
 
     // Load Monaco Editor
     require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs" } });
     require(["vs/editor/editor.main"], async () => {
       // Fetch existing code
-      const res = await fetch(`/api/file?repo=${encodeURIComponent(REPO)}&path=lib/main.dart`);
-      const data = await res.json();
+      let codeContent = "";
+      try {
+        const res = await fetch(`/api/file?repo=${encodeURIComponent(REPO)}&path=lib/main.dart`);
+        const data = await res.json();
+        codeContent = data.content;
+      } catch(e) {}
 
-      const defaultCode = `import 'package:flutter/material.dart';
+      // If no code found, use default
+      if (!codeContent) {
+        codeContent = `import 'package:flutter/material.dart';
 
 void main() => runApp(MyApp());
 
@@ -171,24 +233,52 @@ class MyApp extends StatelessWidget {
     );
   }
 }`;
+      }
 
-      // Initialize Editor
+      // Initialize Editor (Locked by default)
       editor = monaco.editor.create(document.getElementById("editor"), {
-        value: data.content || defaultCode,
+        value: codeContent,
         language: "dart",
         theme: "vs-dark",
         automaticLayout: true,
         fontSize: 14,
-        minimap: { enabled: false }, // Mobile friendly
+        minimap: { enabled: false },
+        readOnly: true, // 🔒 লক করা আছে
         padding: { top: 15 }
       });
+
+      // Show lock overlay
+      document.getElementById("editor-lock-overlay").style.display = "flex";
     });
 
-    // Helper functions for logging
+    // Edit/Unlock Toggle Function
+    function toggleEdit() {
+      if (!editor) return;
+      
+      isEditable = !isEditable;
+      editor.updateOptions({ readOnly: !isEditable });
+      
+      const btn = document.getElementById("btn-edit");
+      const overlay = document.getElementById("editor-lock-overlay");
+      
+      if (isEditable) {
+        btn.textContent = "Lock";
+        btn.classList.add("active");
+        overlay.style.display = "none"; // ওভারলে সরিয়ে নিন
+        setStatus("Editing Mode (Unlocked)");
+      } else {
+        btn.textContent = "Edit";
+        btn.classList.remove("active");
+        overlay.style.display = "flex"; // আবার লক করুন
+        setStatus("Read-Only Mode");
+      }
+    }
+
+    // Helper functions
     function setStatus(msg, isError = false) { 
       const el = document.getElementById("status");
       el.textContent = msg; 
-      el.style.color = isError ? "#f87171" : "#4ade80";
+      el.style.color = isError ? "#f87171" : "#60a5fa";
     }
 
     function log(msg, type = 'normal') {
@@ -201,11 +291,16 @@ class MyApp extends StatelessWidget {
       
       div.textContent = `> ${msg}`;
       el.appendChild(div);
-      el.scrollTop = el.scrollHeight; // Auto-scroll to bottom
+      el.scrollTop = el.scrollHeight;
     }
 
-    // 1. Save Code Function
+    // Save Code Function
     async function saveFile() {
+      if (!isEditable) {
+        log("Please click 'Edit' before saving.", 'error');
+        return;
+      }
+      
       setStatus("Saving...");
       log("Attempting to save lib/main.dart...", 'info');
       
@@ -219,10 +314,14 @@ class MyApp extends StatelessWidget {
             content: editor.getValue(),
           }),
         });
+        
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) throw new Error("Server Error");
+        
         const data = await res.json();
         
         if (data.status === "saved") {
-          setStatus("Saved");
+          setStatus("Saved Successfully");
           log("Code saved successfully to your repository.", 'success');
         } else {
           setStatus("Save Failed", true);
@@ -234,7 +333,7 @@ class MyApp extends StatelessWidget {
       }
     }
 
-    // 2. Build APK Function
+    // Build APK Function
     async function buildApp() {
       setStatus("Triggering Build...");
       log("Initiating build process on the server...", 'info');
@@ -245,12 +344,18 @@ class MyApp extends StatelessWidget {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ repo: REPO }),
         });
+        
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            throw new Error("Server Error (HTML returned). Check Render Logs.");
+        }
+
         const data = await res.json();
         
         if (res.ok && data.status === "building") {
           setStatus("Building...");
           log("Build successfully triggered on GitHub Actions.", 'success');
-          log("Please wait a few minutes, then click 'Check Status'.", 'info');
+          log("Please wait a few minutes, then click 'Status'.", 'info');
         } else {
           setStatus("Build Failed", true);
           log(`Error: ${data.error || "Could not trigger build."}`, 'error');
@@ -261,17 +366,23 @@ class MyApp extends StatelessWidget {
       }
     }
 
-    // 3. Check Status & Download Link
+    // Check Status Function
     async function checkStatus() {
-      setStatus("Checking...");
-      log("Fetching latest build status from GitHub...", 'info');
+      setStatus("Checking Status...");
+      log("Fetching latest build status...", 'info');
       
       try {
         const res = await fetch(`/api/build-status?repo=${encodeURIComponent(REPO)}`);
+        
+        const contentType = res.headers.get("content-type");
+        if (!contentType || !contentType.includes("application/json")) {
+            throw new Error("Server Error (HTML returned).");
+        }
+
         const data = await res.json();
         
         if (data.status === "no runs yet") {
-          setStatus("No Builds");
+          setStatus("No Builds Found");
           log("No builds found yet. Click 'Build APK' first.", 'error');
           return;
         }
@@ -282,7 +393,6 @@ class MyApp extends StatelessWidget {
           log("Build Successful!", 'success');
           const downloadUrl = data.artifacts[0].url;
           
-          // Create download button in output
           const el = document.getElementById("output");
           const btnDiv = document.createElement("div");
           btnDiv.innerHTML = `
@@ -295,9 +405,9 @@ class MyApp extends StatelessWidget {
           el.scrollTop = el.scrollHeight;
           
         } else if (data.conclusion === "failure") {
-          log("Build Failed! Please check your Flutter code or repository files.", 'error');
+          log("Build Failed! Check your code or repo files.", 'error');
         } else {
-          log(`Current Status: ${data.status}. GitHub Actions is still working...`, 'info');
+          log(`Current Status: ${data.status}. GitHub Actions is working...`, 'info');
         }
       } catch (err) {
         setStatus("Error", true);
