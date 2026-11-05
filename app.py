@@ -58,7 +58,7 @@ def logout():
     return redirect(url_for("landing"))
 
 # ==========================================
-# REPO SELECT
+# REPO SELECT & API
 # ==========================================
 @app.route("/select")
 def select_repo():
@@ -107,9 +107,14 @@ def get_file():
         return jsonify({"error": "not signed in"}), 401
     repo_full = request.args.get("repo")
     path = request.args.get("path", "lib/main.dart")
+    
+    # যদি লিংক দেওয়া থাকে, তবে সেটা থেকে user/repo ফরম্যাট বানানো
+    if "github.com/" in repo_full:
+        repo_full = repo_full.split("github.com/")[-1].strip("/")
+        
     gh = Github(session["token"])
-    repo = gh.get_repo(repo_full)
     try:
+        repo = gh.get_repo(repo_full)
         content = repo.get_contents(path)
         return jsonify({"content": content.decoded_content.decode("utf-8")})
     except GithubException:
@@ -121,27 +126,78 @@ def save_file():
         return jsonify({"error": "not signed in"}), 401
     data = request.json
     repo_full = data["repo"]
+    
+    if "github.com/" in repo_full:
+        repo_full = repo_full.split("github.com/")[-1].strip("/")
+
     path = data["path"]
     content = data["content"]
     gh = Github(session["token"])
-    repo = gh.get_repo(repo_full)
     try:
+        repo = gh.get_repo(repo_full)
         existing = repo.get_contents(path)
         repo.update_file(path, f"Update {path}", content, existing.sha)
+        return jsonify({"status": "saved"})
     except GithubException:
-        repo.create_file(path, f"Create {path}", content)
-    return jsonify({"status": "saved"})
+        try:
+            repo.create_file(path, f"Create {path}", content)
+            return jsonify({"status": "saved"})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 400
 
 # ==========================================
-# BUILD API (FINAL FIX)
+# BUILD API (Clone to Admin Repo & Build)
 # ==========================================
 @app.route("/api/build", methods=["POST"])
 def build():
     if "token" not in session:
         return jsonify({"error": "not signed in"}), 401
     
+    data = request.json
+    source_repo = data.get("repo")
+    if not source_repo:
+        return jsonify({"error": "No repository provided"}), 400
+
+    # লিংক থেকে user/repo বের করা
+    if "github.com/" in source_repo:
+        source_repo = source_repo.split("github.com/")[-1].strip("/")
+
     try:
-        # ওয়ার্কফ্লো ফাইলের কোড সরাসরি এখানে
+        user_gh = Github(session["token"])
+        admin_gh = Github(GITHUB_TOKEN)
+        
+        # ১. ইউজারের রিপো অ্যাক্সেস করা
+        try:
+            src_repo = user_gh.get_repo(source_repo)
+        except GithubException:
+            # যদি ইউজারের প্রাইভেট রিপো হয় বা অ্যাক্সেস না থাকে, তবে সরাসরি পাবলিক হিসেবে ট্রাই করা
+            try:
+                src_repo = Github().get_repo(source_repo)
+            except:
+                return jsonify({"error": "Repository not found or not accessible."}), 400
+
+        # ২. আপনার বিল্ডার রিপো (hello-backend)
+        builder_repo = admin_gh.get_repo(f"{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}")
+
+        # ৩. মূল ফাইলগুলো (pubspec.yaml, lib/main.dart) কপি করা
+        files_to_copy = ["pubspec.yaml", "lib/main.dart"]
+        copied = 0
+        
+        for path in files_to_copy:
+            try:
+                src_content = src_repo.get_contents(path)
+                content_data = src_content.decoded_content
+                
+                try:
+                    existing = builder_repo.get_contents(path)
+                    builder_repo.update_file(path, f"Update {path} from {source_repo}", content_data, existing.sha)
+                except GithubException:
+                    builder_repo.create_file(path, f"Create {path} from {source_repo}", content_data)
+                copied += 1
+            except GithubException:
+                pass # ফাইল না থাকলে স্কিপ করবে
+
+        # ৪. ওয়ার্কফ্লো আপডেট
         workflow_content = """name: Build APK
 on:
   workflow_dispatch:
@@ -164,18 +220,14 @@ jobs:
           name: app-release
           path: build/app/outputs/flutter-apk/app-release.apk
 """
-        admin_gh = Github(GITHUB_TOKEN)
-        builder_repo = admin_gh.get_repo(f"{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}")
-
-        # গিটহাবে build.yml ফাইলটি আপডেট করা
         workflow_path = ".github/workflows/build.yml"
         try:
             existing = builder_repo.get_contents(workflow_path)
-            builder_repo.update_file(workflow_path, "Update build workflow", workflow_content, existing.sha)
+            builder_repo.update_file(workflow_path, "Update workflow", workflow_content, existing.sha)
         except GithubException:
-            builder_repo.create_file(workflow_path, "Add build workflow", workflow_content)
+            builder_repo.create_file(workflow_path, "Add workflow", workflow_content)
 
-        # সরাসরি রিকোয়েস্ট পাঠানো (Triggering GitHub Actions)
+        # ৫. ট্রিগার বিল্ড
         url = f"https://api.github.com/repos/{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}/actions/workflows/build.yml/dispatches"
         r = requests.post(
             url,
@@ -187,9 +239,9 @@ jobs:
         )
         
         if r.status_code not in (204, 201):
-            return jsonify({"error": f"GitHub API Error: {r.status_code} - {r.text}"}), 400
+            return jsonify({"error": f"GitHub API Error: {r.text}"}), 400
             
-        return jsonify({"status": "building"})
+        return jsonify({"status": "building", "copied_files": copied})
         
     except Exception as e:
         return jsonify({"error": f"Server Error: {str(e)}"}), 500
@@ -201,9 +253,11 @@ jobs:
 def build_status():
     if "token" not in session:
         return jsonify({"error": "not signed in"}), 401
+    
     try:
         admin_gh = Github(GITHUB_TOKEN)
         builder_repo = admin_gh.get_repo(f"{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}")
+        
         runs = builder_repo.get_workflow_runs()
         if not runs.totalCount:
             return jsonify({"status": "no runs yet"})
