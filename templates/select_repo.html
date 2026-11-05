@@ -5,22 +5,49 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Select a Project — Shahajjo Studio</title>
   <link rel="stylesheet" href="/static/style.css">
+  <style>
+    .link-box {
+      background: #111;
+      padding: 20px;
+      border: 1px solid #333;
+      margin-bottom: 30px;
+      border-radius: 8px;
+    }
+    .link-box h3 { margin-top: 0; font-size: 16px; margin-bottom: 15px; color: #fff; }
+    .link-input-group { display: flex; gap: 10px; }
+    .link-input-group input {
+      flex: 1;
+      padding: 12px;
+      background: #000;
+      border: 1px solid #444;
+      color: #fff;
+      border-radius: 4px;
+      outline: none;
+    }
+    .link-input-group input:focus { border-color: #fff; }
+  </style>
 </head>
 <body>
   <div class="page">
     <h1>Select a project</h1>
-    <p class="sub">Choose an existing project or create a new one to start building.</p>
+    <p class="sub">Choose an existing project or paste a public GitHub URL to build.</p>
 
-    <div class="new-repo">
-      <input id="repoName" placeholder="new-project-name" />
-      <button class="btn" onclick="createProject()">Create Project</button>
+    <!-- অপশন ১: গিটহাব লিংক দিয়ে বিল্ড -->
+    <div class="link-box">
+      <h3>Option 1: Paste Public GitHub Repo URL</h3>
+      <div class="link-input-group">
+        <input id="repoUrl" placeholder="https://github.com/user/flutter-repo" />
+        <button class="btn" onclick="buildFromUrl()">Load & Build</button>
+      </div>
     </div>
 
+    <!-- অপশন ২: নিজের রিপো সিলেক্ট করা -->
+    <h3 style="font-size: 16px; margin-bottom: 15px;">Option 2: Select Your Repo</h3>
     <div id="repoList" class="repo-list">
       <div class="repo-item"><span class="name">Loading projects...</span></div>
     </div>
 
-    <div style="margin-top: 30px;">
+    <div style="margin-top: 40px;">
       <a class="btn outline" href="/logout">Sign Out</a>
     </div>
   </div>
@@ -30,17 +57,19 @@
       const res = await fetch("/api/repos");
       const repos = await res.json();
       const list = document.getElementById("repoList");
+      
       if (!repos.length) {
-        list.innerHTML = '<div class="repo-item"><span class="name">No projects yet. Create one above.</span></div>';
+        list.innerHTML = '<div class="repo-item"><span class="name">No projects yet.</span></div>';
         return;
       }
+      
       list.innerHTML = repos.map(r => `
         <div class="repo-item">
           <span>
             <span class="name">${r.name}</span>
             ${r.private ? '<span class="tag">Private</span>' : ''}
           </span>
-          <button onclick="openRepo('${r.full_name}')">Open</button>
+          <button onclick="openRepo('${r.full_name}')">Open Editor</button>
         </div>
       `).join("");
     }
@@ -49,20 +78,13 @@
       window.location.href = "/editor?repo=" + encodeURIComponent(fullName);
     }
 
-    async function createProject() {
-      const name = document.getElementById("repoName").value.trim();
-      if (!name) return alert("Enter a project name.");
-      const res = await fetch("/api/create-project", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repo_name: name }),
-      });
-      const data = await res.json();
-      if (data.repo) {
-        openRepo(data.repo);
-      } else {
-        alert(data.error || "Could not create project.");
+    function buildFromUrl() {
+      const url = document.getElementById("repoUrl").value.trim();
+      if (!url || !url.includes("github.com")) {
+        return alert("Please enter a valid GitHub URL.");
       }
+      // সরাসরি এডিটরে নিয়ে যাবে
+      window.location.href = "/editor?repo=" + encodeURIComponent(url);
     }
 
     loadRepos();
