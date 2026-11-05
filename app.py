@@ -12,6 +12,7 @@ GITHUB_OWNER = "sillyratheu"
 GITHUB_BUILDER_REPO = "hello-backend"
 
 
+# --- LANDING PAGE WITH TYPING ANIMATION ---
 LANDING_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -21,7 +22,11 @@ LANDING_TEMPLATE = """
     <title>Shahajjo - Cloud APK Builder</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Geist', sans-serif; background-color: #000000; color: #ededed; }</style>
+    <style>
+        body { font-family: 'Geist', sans-serif; background-color: #000000; color: #ededed; }
+        .typing-effect::after { content: '|'; animation: blink 1s infinite; }
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+    </style>
 </head>
 <body class="min-h-screen flex flex-col justify-between selection:bg-white selection:text-black">
     <header class="w-full border-b border-neutral-900 px-6 py-4 flex justify-between items-center max-w-6xl mx-auto">
@@ -36,28 +41,74 @@ LANDING_TEMPLATE = """
             {% endif %}
         </div>
     </header>
+
     <main class="flex-grow flex flex-col items-center justify-center text-center px-4 max-w-3xl mx-auto">
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-neutral-800 bg-neutral-950 text-xs text-neutral-400 mb-6">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Put Only Source code to make a native app
         </div>
-        <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6">
-            Build Android Apps from <br><span class="text-neutral-400">GitHub Repositories.</span>
+        
+        <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6 h-24 md:h-auto">
+            Build Android Apps from <br><span id="typing-text" class="text-neutral-400 typing-effect"></span>
         </h1>
-        <div>
+        
+        <p class="text-neutral-400 text-sm md:text-base max-w-xl mb-10 font-light leading-relaxed">
+            Transform any GitHub repository into a production-ready native APK automatically via serverless cloud workflows.
+        </p>
+
+        <div class="flex flex-col sm:flex-row gap-4 w-full justify-center">
             {% if user %}
                 <a href="/dashboard" class="bg-white text-black font-medium px-8 py-3.5 rounded-xl hover:bg-neutral-200 transition shadow-lg">Open Dashboard</a>
             {% else %}
-                <a href="/login" class="bg-white text-black font-medium px-8 py-3.5 rounded-xl hover:bg-neutral-200 transition shadow-lg">Get Started with GitHub</a>
+                <a href="/login" class="bg-white text-black font-medium px-8 py-3.5 rounded-xl hover:bg-neutral-200 transition shadow-lg flex items-center justify-center gap-2">
+                    Get Started with GitHub
+                </a>
             {% endif %}
         </div>
     </main>
+
     <footer class="w-full border-t border-neutral-900 py-6 text-center text-xs text-neutral-600">
         &copy; 2026 Shahajjo Corporation. All rights reserved.
     </footer>
+
+    <script>
+        const words = ["GitHub Repositories.", "Public Source Code.", "Python & Native Projects."];
+        let i = 0;
+        function typingEffect() {
+            let word = words[i].split("");
+            var loopTyping = function() {
+                if (word.length > 0) {
+                    document.getElementById('typing-text').innerHTML += word.shift();
+                } else {
+                    setTimeout(deletingEffect, 2000);
+                    return false;
+                }
+                setTimeout(loopTyping, 100);
+            };
+            loopTyping();
+        }
+        function deletingEffect() {
+            let word = words[i].split("");
+            var loopDeleting = function() {
+                if (word.length > 0) {
+                    word.pop();
+                    document.getElementById('typing-text').innerHTML = word.join("");
+                } else {
+                    i = (words.length > (i + 1)) ? i + 1 : 0;
+                    setTimeout(typingEffect, 500);
+                    return false;
+                }
+                setTimeout(loopDeleting, 50);
+            };
+            loopDeleting();
+        }
+        typingEffect();
+    </script>
 </body>
 </html>
 """
 
+
+# --- DASHBOARD TEMPLATE ---
 DASHBOARD_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -84,12 +135,15 @@ DASHBOARD_TEMPLATE = """
                 <a href="/logout" class="bg-neutral-900 text-red-400 px-4 py-2 rounded-xl text-xs font-medium border border-neutral-800">Logout</a>
             </div>
         </div>
+        
         <div class="bg-neutral-950 border border-neutral-900 rounded-2xl p-8 shadow-2xl">
             <div class="mb-6 p-3 rounded-xl bg-neutral-900/50 border border-neutral-800 text-xs text-emerald-400 font-medium">
                 ℹ️ Put Only Source code to make a native app
             </div>
+
             <h3 class="text-lg font-bold text-white mb-1">Compiler Control Center</h3>
             <p class="text-neutral-500 text-xs mb-6">Select your personal repository or enter a public link to start compilation.</p>
+            
             <form action="/start-build" method="POST" class="space-y-5">
                 <div>
                     <label class="block text-xs font-medium text-neutral-400 mb-2 uppercase tracking-wider">Select Your Repository</label>
@@ -100,15 +154,19 @@ DASHBOARD_TEMPLATE = """
                         {% endfor %}
                     </select>
                 </div>
+
                 <div class="text-center text-xs text-neutral-600 font-semibold">— OR —</div>
+
                 <div>
                     <label class="block text-xs font-medium text-neutral-400 mb-2 uppercase tracking-wider">Public Repository URL</label>
                     <input type="url" name="custom_repo" placeholder="https://github.com/username/repository" class="w-full bg-black border border-neutral-800 rounded-xl p-3.5 text-sm text-neutral-200 focus:outline-none focus:border-white">
                 </div>
+
                 <div>
                     <label class="block text-xs font-medium text-neutral-400 mb-2 uppercase tracking-wider">App Name</label>
                     <input type="text" name="app_name" required placeholder="My Awesome App" class="w-full bg-black border border-neutral-800 rounded-xl p-3.5 text-sm text-neutral-200 focus:outline-none focus:border-white">
                 </div>
+
                 <button type="submit" class="w-full bg-white text-black font-semibold py-3.5 px-4 rounded-xl hover:bg-neutral-200 transition text-sm cursor-pointer mt-2">
                     Initialize Cloud Build 🚀
                 </button>
@@ -119,6 +177,8 @@ DASHBOARD_TEMPLATE = """
 </html>
 """
 
+
+# --- BUILD STATUS TEMPLATE ---
 BUILD_STATUS_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -154,7 +214,7 @@ BUILD_STATUS_TEMPLATE = """
                     {% elif status == 'completed' and conclusion == 'success' %}
                         <p class="text-emerald-400">✅ Build completed successfully and real APK is ready!</p>
                     {% else %}
-                        <p class="text-red-400">❌ Build failed or encountered an error. Please check your repository or build logs.</p>
+                        <p class="text-red-400">❌ Build failed. Please ensure your repository contains valid Python source code or build configuration.</p>
                     {% endif %}
                 </div>
             </div>
@@ -278,7 +338,6 @@ def build_status():
         conclusion = latest_run.get("conclusion")
 
     download_url = None
-    # Shudhumatro jokhon build puro complete ebong success hobe, tokhoni release theke download link anbe
     if status == "completed" and conclusion == "success":
         release_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_BUILDER_REPO}/releases/latest"
         release_res = requests.get(release_url, headers=headers).json()
