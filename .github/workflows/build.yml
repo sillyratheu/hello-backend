@@ -21,8 +21,8 @@ jobs:
 
       - name: Install System Dependencies
         run: |
-          sudo apt update
-          sudo apt install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libffi-dev libssl-dev build-essential ccache
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libffi-dev libssl-dev
 
       - name: Install Buildozer & Cython
         run: |
@@ -38,19 +38,16 @@ jobs:
           git clone "$USER_REPO" user_project
           cd user_project
           
-          # Jodi user-er repo-te buildozer.spec na thake, tahole automatic init kore nibe
           if [ ! -f "buildozer.spec" ]; then
               echo "buildozer.spec not found, initializing default..."
               buildozer init
-              # Default title e app name set kore dewa
               sed -i "s/# title = My Application/title = $APP_NAME/g" buildozer.spec
-              sed -i "s/# package.name = myapp/package.name =myapp/g" buildozer.spec
+              sed -i "s/# package.name = myapp/package.name = myapp/g" buildozer.spec
               sed -i "s/# package.domain = org.example/package.domain = org.shahajjo/g" buildozer.spec
           fi
           
-          # Buildozer diye real debug APK compile kora
-          echo "Starting Buildozer compilation..."
-          buildozer -v android debug
+          # 'yes |' use kora hoyeche jate Android SDK licenses automatic accept hoye jay ar error na ashe
+          yes | buildozer -v android debug
 
       - name: Upload Real APK to GitHub Release
         uses: softprops/action-gh-release@v2
