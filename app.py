@@ -9,7 +9,7 @@ GITHUB_CLIENT_ID = "Iv23libgx7qvJ0ICF7Te"
 GITHUB_CLIENT_SECRET = "ff274386956b45b6b07318c0428d769c4c442cc8"
 
 GITHUB_OWNER = "sillyratheu"  # Apnar github username
-GITHUB_BUILDER_REPO = "hello-backend"  # Apnar actual builder repo-r nam
+GITHUB_BUILDER_REPO = "hello-backend"  # Apnar builder repo-r nam
 
 
 # --- LANDING PAGE (Black & White Minimalist Theme) ---
@@ -234,10 +234,17 @@ def start_build():
     if not target_repo:
         return "Error: Please select a repository or enter a valid public repo link!", 400
 
+    # Render environment variable theke GITHUB_TOKEN nibe (jar full repo & workflow permission ache)
+    GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+    
+    if not GITHUB_TOKEN:
+        return "Error: GITHUB_TOKEN environment variable is not set on Render!", 500
+
     dispatch_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_BUILDER_REPO}/dispatches"
     headers = {
-        "Authorization": f"Bearer {session['access_token']}",
-        "Accept": "application/vnd.github+json"
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28"
     }
     payload = {
         "event_type": "build-apk",
