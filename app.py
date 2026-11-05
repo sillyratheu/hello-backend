@@ -9,7 +9,7 @@ GITHUB_CLIENT_ID = "Iv23libgx7qvJ0ICF7Te"
 GITHUB_CLIENT_SECRET = "ff274386956b45b6b07318c0428d769c4c442cc8"
 
 GITHUB_OWNER = "sillyratheu"  # Apnar github username
-GITHUB_BUILDER_REPO = "shahajjo-builder"  # Apnar builder repo-r nam
+GITHUB_BUILDER_REPO = "hello-backend"  # Apnar builder repo-r nam
 
 
 # --- LANDING PAGE WITH TYPING ANIMATION (Black & White Minimalist Theme) ---
