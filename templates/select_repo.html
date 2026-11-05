@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Select a Project — Shahajjo Studio</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="page">
+    <h1>Select a project</h1>
+    <p class="sub">Choose an existing project or create a new one to start building.</p>
+
+    <div class="new-repo">
+      <input id="repoName" placeholder="new-project-name" />
+      <button class="btn" onclick="createProject()">Create Project</button>
+    </div>
+
+    <div id="repoList" class="repo-list">
+      <div class="repo-item"><span class="name">Loading projects...</span></div>
+    </div>
+
+    <div style="margin-top: 30px;">
+      <a class="btn outline" href="/logout">Sign Out</a>
+    </div>
+  </div>
+
+  <script>
+    async function loadRepos() {
+      const res = await fetch("/api/repos");
+      const repos = await res.json();
+      const list = document.getElementById("repoList");
+      if (!repos.length) {
+        list.innerHTML = '<div class="repo-item"><span class="name">No projects yet. Create one above.</span></div>';
+        return;
+      }
+      list.innerHTML = repos.map(r => `
+        <div class="repo-item">
+          <span>
+            <span class="name">${r.name}</span>
+            ${r.private ? '<span class="tag">Private</span>' : ''}
+          </span>
+          <button onclick="openRepo('${r.full_name}')">Open</button>
+        </div>
+      `).join("");
+    }
+
+    function openRepo(fullName) {
+      window.location.href = "/editor?repo=" + encodeURIComponent(fullName);
+    }
+
+    async function createProject() {
+      const name = document.getElementById("repoName").value.trim();
+      if (!name) return alert("Enter a project name.");
+      const res = await fetch("/api/create-project", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repo_name: name }),
+      });
+      const data = await res.json();
+      if (data.repo) {
+        openRepo(data.repo);
+      } else {
+        alert(data.error || "Could not create project.");
+      }
+    }
+
+    loadRepos();
+  </script>
+</body>
+</html>
