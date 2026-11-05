@@ -13,8 +13,8 @@ jobs:
 
       - name: Clone User Repository & Compile via Docker Buildozer
         run: |
-          USER_REPO="${{ github.event.client_payload.repo_url }}"
-          APP_NAME="${{ github.event.client_payload.app_name }}"
+          USER_REPO="https://github.com/plainhub/plain-app.git"
+          APP_NAME="Ramim"
           
           echo "Cloning user repository: $USER_REPO"
           git clone "$USER_REPO" user_project
@@ -25,17 +25,17 @@ jobs:
               pip install buildozer
               buildozer init
               sed -i "s/# title = My Application/title = $APP_NAME/g" buildozer.spec
-              sed -i "s/# package.name = myapp/package.name = myapp/g" buildozer.spec
+              sed -i "s/# package.name = ramimapp/package.name = ramimapp/g" buildozer.spec
               sed -i "s/# package.domain = org.example/package.domain = org.shahajjo/g" buildozer.spec
+          else
+              sed -i "s/title = .*/title = $APP_NAME/g" buildozer.spec
           fi
           
           echo "android.accept_sdk_license = True" >> buildozer.spec
           cd ..
 
-          # Fix permission so non-root container user can access files
           sudo chmod -R 777 user_project
 
-          # Run buildozer inside docker with environment variable to bypass root warning prompt
           docker run --rm \
             -e BUILDOZER_ALLOW_INSTALL=1 \
             -v "$(pwd)/user_project:/home/user/hostproject" \
