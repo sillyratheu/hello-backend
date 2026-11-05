@@ -29,13 +29,15 @@ jobs:
               sed -i "s/# package.domain = org.example/package.domain = org.shahajjo/g" buildozer.spec
           fi
           
-          # Force accept sdk license inside spec
           echo "android.accept_sdk_license = True" >> buildozer.spec
-
           cd ..
-          
-          # Run official buildozer inside isolated Docker container (No license or dependency error)
+
+          # Fix permission so non-root container user can access files
+          sudo chmod -R 777 user_project
+
+          # Run buildozer inside docker with environment variable to bypass root warning prompt
           docker run --rm \
+            -e BUILDOZER_ALLOW_INSTALL=1 \
             -v "$(pwd)/user_project:/home/user/hostproject" \
             kivy/buildozer:latest \
             bash -c "cd /home/user/hostproject && buildozer -v android debug"
