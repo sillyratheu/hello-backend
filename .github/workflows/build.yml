@@ -1,11 +1,8 @@
-name: Real Android APK Builder
+name: Briefcase Android APK Builder
 
 on:
   repository_dispatch:
     types: [build-apk]
-
-permissions:
-  contents: write
 
 jobs:
   build:
@@ -19,17 +16,17 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install System Dependencies
+      - name: Install System Dependencies & Java
         run: |
           sudo apt-get update
-          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libffi-dev libssl-dev
+          sudo apt-get install -y git zip unzip openjdk-17-jdk python3-pip
 
-      - name: Install Buildozer & Cython
+      - name: Install Briefcase
         run: |
           pip install --upgrade pip
-          pip install buildozer cython==0.29.33
+          pip install briefcase
 
-      - name: Clone User Repository & Compile APK
+      - name: Clone User Repository & Compile with Briefcase
         run: |
           USER_REPO="${{ github.event.client_payload.repo_url }}"
           APP_NAME="${{ github.event.client_payload.app_name }}"
@@ -38,40 +35,22 @@ jobs:
           git clone "$USER_REPO" user_project
           cd user_project
           
-          if [ ! -f "buildozer.spec" ]; then
-              echo "buildozer.spec not found, initializing default..."
-              buildozer init
-              sed -i "s/# title = My Application/title = $APP_NAME/g" buildozer.spec
-              sed -i "s/# package.name = myapp/package.name = myapp/g" buildozer.spec
-              sed -i "s/# package.domain = org.example/package.domain = org.shahajjo/g" buildozer.spec
+          # Jodi user-er repo-te pyproject.toml na thake, tahole briefcase create kore nibe
+          if [ ! -f "pyproject.toml" ]; then
+              echo "pyproject.toml not found, initializing briefcase project..."
+              briefcase new --no-input \
+                --formal-name "$APP_NAME" \
+                --app-name "myapp" \
+                --bundle "org.shahajjo" \
+                --gui PyQt5
           fi
           
-          # Clean and bug-free Python script to force accept SDK license
-          python3 -c "
-          with open('buildozer.spec', 'r') as f:
-              content = f.read()
+          # Build Android APK using briefcase
+          briefcase create android
+          briefcase build android
 
-          if 'android.accept_sdk_license' in content:
-              content = content.replace('#android.accept_sdk_license = False', 'android.accept_sdk_license = True')
-              content = content.replace('android.accept_sdk_license = False', 'android.accept_sdk_license = True')
-          else:
-              content += '\nandroid.accept_sdk_license = True\n'
-
-          with open('buildozer.spec', 'w') as f:
-              f.write(content)
-          print('Successfully set android.accept_sdk_license = True')
-          "
-          
-          # Run buildozer compilation smoothly
-          buildozer -v android debug
-
-      - name: Upload and Overwrite Latest APK Release
-        uses: softprops/action-gh-release@v2
+      - name: Upload APK as GitHub Artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: latest-build
-          name: "Shahajjo Cloud Compiled APK"
-          files: user_project/bin/*.apk
-          overwrite: true
-          body: "Auto-compiled APK generated via Shahajjo platform."
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: compiled-app-apk
+          path: user_project/build/*/android/gradle/app/build/outputs/apk/debug/*.apk
