@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Editor — Shahajjo Studio</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+</head>
+<body>
+  <div class="topbar">
+    <span class="brand">Shahajjo</span>
+    <span class="repo" id="repoLabel">{{ repo }}</span>
+    <button onclick="saveFile()">Save</button>
+    <button onclick="buildApp()">Build APK</button>
+    <button onclick="checkStatus()">Status</button>
+    <button onclick="location.href='/select'">Projects</button>
+    <span id="status">Ready</span>
+  </div>
+
+  <div id="editor" style="height: calc(100vh - 60px - 130px);"></div>
+  <div id="output">Output will appear here.</div>
+
+  <script>
+    const REPO = "{{ repo }}";
+    let editor;
+
+    require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs" } });
+    require(["vs/editor/editor.main"], async () => {
+      const res = await fetch(`/api/file?repo=${encodeURIComponent(REPO)}&path=lib/main.dart`);
+      const data = await res.json();
+
+      const defaultCode = `import 'package:flutter/material.dart';
+
+void main() => runApp(MyApp());
+
+class MyApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      home: Scaffold(
+        appBar: AppBar(title: Text('My App')),
+        body: Center(child: Text('Built with Shahajjo Studio')),
+      ),
+    );
+  }
+}`;
+
+      editor = monaco.editor.create(document.getElementById("editor"), {
+        value: data.content || defaultCode,
+        language: "dart",
+        theme: "vs-dark",
+        automaticLayout: true,
+        fontSize: 14,
+      });
+    });
+
+    function setStatus(msg) { document.getElementById("status").textContent = msg; }
+    function log(msg) {
+      const el = document.getElementById("output");
+      el.textContent = "> " + msg + "\n" + el.textContent;
+    }
+
+    async function saveFile() {
+      setStatus("Saving...");
+      const res = await fetch("/api/file", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repo: REPO,
+          path: "lib/main.dart",
+          content: editor.getValue(),
+        }),
+      });
+      const data = await res.json();
+      setStatus(data.status === "saved" ? "Saved" : "Save failed");
+      log(data.status === "saved" ? "Code saved successfully." : "Save failed.");
+    }
+
+    async function buildApp() {
+      setStatus("Starting build...");
+      const res = await fetch("/api/build", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repo: REPO }),
+      });
+      const data = await res.json();
+      setStatus(data.status === "building" ? "Building..." : "Build failed");
+      log(JSON.stringify(data));
+    }
+
+    async function checkStatus() {
+      const res = await fetch(`/api/build-status?repo=${encodeURIComponent(REPO)}`);
+      const data = await res.json();
+      setStatus(`${data.status}${data.conclusion ? " / " + data.conclusion : ""}`);
+      log(JSON.stringify(data, null, 2));
+    }
+  </script>
+</body>
+</html>
