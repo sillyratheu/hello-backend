@@ -1,5 +1,4 @@
 import os
-import time
 import requests
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session
 from github import Github, GithubException
@@ -12,9 +11,7 @@ app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-change-me")
 
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID")
 GITHUB_CLIENT_SECRET = os.getenv("GITHUB_CLIENT_SECRET")
-# এটি আপনার গিটহাব টোকেন (Render-এ সেট করা)
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN") 
-# আপনার রিপো যেখানে বিল্ড হবে
 GITHUB_BUILDER_OWNER = os.getenv("GITHUB_BUILDER_OWNER", "sillyratheu")
 GITHUB_BUILDER_REPO = os.getenv("GITHUB_BUILDER_REPO", "hello-backend")
 
@@ -82,7 +79,6 @@ def create_project():
     data = request.json or {}
     repo_name = data.get("repo_name", "").strip()
     
-    # ইউজারের টোকেন দিয়ে তার অ্যাকাউন্টে নতুন রিপো তৈরি হবে
     gh = Github(session["token"])
     user = gh.get_user()
     
@@ -102,7 +98,7 @@ def editor():
         return redirect(url_for("select_repo"))
     return render_template("editor.html", repo=repo)
 
-# ---------- File APIs (ইউজারের নিজের রিপোতে সেভ হবে) ----------
+# ---------- File APIs ----------
 @app.route("/api/file", methods=["GET"])
 def get_file():
     if "token" not in session:
@@ -134,70 +130,67 @@ def save_file():
         repo.create_file(path, f"Create {path}", content)
     return jsonify({"status": "saved"})
 
-# ---------- Build System (এখানে আপনার GITHUB_TOKEN ব্যবহার হবে) ----------
+# ---------- Build System (Admin Token Used Here) ----------
 @app.route("/api/build", methods=["POST"])
 def build():
     if "token" not in session:
         return jsonify({"error": "not signed in"}), 401
     
-    # ইউজার যে রিপোতে কাজ করছে, সেটার নাম নেওয়া হচ্ছে
-    user_repo = request.json["repo"] 
-    
-    # অ্যাডমিন (আপনার) টোকেন দিয়ে আপনার বিল্ডার রিপোতে অ্যাক্সেস নেওয়া হচ্ছে
-    admin_gh = Github(GITHUB_TOKEN)
     try:
+        # ওয়ার্কফ্লো ফাইল পড়া
+        try:
+            workflow_content = open("workflow_template.yml").read()
+        except FileNotFoundError:
+            return jsonify({"error": "Server Error: workflow_template.yml is missing from the project."}), 500
+
+        admin_gh = Github(GITHUB_TOKEN)
         builder_repo = admin_gh.get_repo(f"{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}")
-    except GithubException:
-        return jsonify({"error": "Builder repository not found. Check your GITHUB_TOKEN."}), 500
 
-    # ১. ওয়ার্কফ্লো ফাইল আপনার রিপোতে আপডেট করা
-    workflow_path = ".github/workflows/build.yml"
-    workflow_content = open("workflow_template.yml").read()
-    try:
-        existing = builder_repo.get_contents(workflow_path)
-        builder_repo.update_file(workflow_path, "Update build workflow", workflow_content, existing.sha)
-    except GithubException:
-        builder_repo.create_file(workflow_path, "Add build workflow", workflow_content)
+        # ওয়ার্কফ্লো ফাইল আপডেট করা
+        workflow_path = ".github/workflows/build.yml"
+        try:
+            existing = builder_repo.get_contents(workflow_path)
+            builder_repo.update_file(workflow_path, "Update build workflow", workflow_content, existing.sha)
+        except GithubException:
+            builder_repo.create_file(workflow_path, "Add build workflow", workflow_content)
 
-    # ২. আপনার রিপোতে GitHub Actions ট্রিগার করা
-    url = f"https://api.github.com/repos/{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}/actions/workflows/build.yml/dispatches"
-    r = requests.post(
-        url,
-        headers={
-            "Authorization": f"Bearer {GITHUB_TOKEN}",
-            "Accept": "application/vnd.github+json",
-        },
-        json={"ref": builder_repo.default_branch},
-    )
-    
-    if r.status_code not in (204, 201):
-        return jsonify({"error": f"GitHub API Error: {r.text}"}), 400
+        # Actions ট্রিগার করা
+        url = f"https://api.github.com/repos/{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}/actions/workflows/build.yml/dispatches"
+        r = requests.post(
+            url,
+            headers={
+                "Authorization": f"Bearer {GITHUB_TOKEN}",
+                "Accept": "application/vnd.github+json",
+            },
+            json={"ref": builder_repo.default_branch},
+        )
         
-    # ৩. বিল্ড শুরু হয়েছে, ইউজারকে জানানো
-    return jsonify({"status": "building", "user_repo": user_repo})
+        if r.status_code not in (204, 201):
+            return jsonify({"error": f"GitHub API Error: {r.status_code} - {r.text}"}), 400
+            
+        return jsonify({"status": "building"})
+        
+    except Exception as e:
+        return jsonify({"error": f"Server Error: {str(e)}"}), 500
 
-# ---------- Build Status + Download Link ----------
+# ---------- Build Status ----------
 @app.route("/api/build-status")
 def build_status():
     if "token" not in session:
         return jsonify({"error": "not signed in"}), 401
     
-    # আপনার রিপোতে বিল্ড স্ট্যাটাস চেক করা হচ্ছে
-    admin_gh = Github(GITHUB_TOKEN)
     try:
+        admin_gh = Github(GITHUB_TOKEN)
         builder_repo = admin_gh.get_repo(f"{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}")
         runs = builder_repo.get_workflow_runs()
         if not runs.totalCount:
             return jsonify({"status": "no runs yet"})
         
         latest = runs[0]
-        
-        # যদি বিল্ড সফল হয়, আর্টিফ্যাক্ট (APK) লিংক খোঁজা
         artifacts = []
         if latest.conclusion == "success":
             for a in latest.get_artifacts():
                 if a.name == "app-release":
-                    # এই লিংকটি ডাউনলোডের জন্য
                     artifacts.append({"name": a.name, "url": a.archive_download_url})
 
         return jsonify({
