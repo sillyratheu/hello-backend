@@ -1,4 +1,4 @@
-name: Real APK Compiler with Buildozer
+name: Real Android APK Builder
 
 on:
   repository_dispatch:
@@ -19,33 +19,37 @@ jobs:
         with:
           python-version: '3.10'
 
-      - name: Install System Dependencies for Buildozer
+      - name: Install System Dependencies
         run: |
           sudo apt update
-          sudo apt install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libffi-dev libssl-dev
+          sudo apt install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libncursesw5-dev libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev libffi-dev libssl-dev build-essential ccache
 
       - name: Install Buildozer & Cython
         run: |
           pip install --upgrade pip
           pip install buildozer cython==0.29.33
 
-      - name: Clone User Repository & Build APK
+      - name: Clone User Repository & Compile APK
         run: |
           USER_REPO="${{ github.event.client_payload.repo_url }}"
           APP_NAME="${{ github.event.client_payload.app_name }}"
           
-          echo "Cloning user repository from: $USER_REPO"
+          echo "Cloning user repository: $USER_REPO"
           git clone "$USER_REPO" user_project
           cd user_project
           
-          # Jodi user-er repo-te buildozer.spec na thake, tahole default ekta init kore nibe
+          # Jodi user-er repo-te buildozer.spec na thake, tahole automatic init kore nibe
           if [ ! -f "buildozer.spec" ]; then
               echo "buildozer.spec not found, initializing default..."
               buildozer init
+              # Default title e app name set kore dewa
+              sed -i "s/# title = My Application/title = $APP_NAME/g" buildozer.spec
+              sed -i "s/# package.name = myapp/package.name =myapp/g" buildozer.spec
+              sed -i "s/# package.domain = org.example/package.domain = org.shahajjo/g" buildozer.spec
           fi
           
-          # Compile Python code to Native Android APK
-          echo "Starting Buildozer android debug compilation..."
+          # Buildozer diye real debug APK compile kora
+          echo "Starting Buildozer compilation..."
           buildozer -v android debug
 
       - name: Upload Real APK to GitHub Release
