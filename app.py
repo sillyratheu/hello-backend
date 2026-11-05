@@ -130,23 +130,43 @@ def save_file():
         repo.create_file(path, f"Create {path}", content)
     return jsonify({"status": "saved"})
 
-# ---------- Build System (Admin Token Used Here) ----------
+# ---------- Build System (Fixed without workflow_template.yml) ----------
 @app.route("/api/build", methods=["POST"])
 def build():
     if "token" not in session:
         return jsonify({"error": "not signed in"}), 401
     
     try:
-        # ওয়ার্কফ্লো ফাইল পড়া
-        try:
-            workflow_content = open("workflow_template.yml").read()
-        except FileNotFoundError:
-            return jsonify({"error": "Server Error: workflow_template.yml is missing from the project."}), 500
+        # ওয়ার্কফ্লো ফাইলের কোড সরাসরি এখানে দেওয়া হলো
+        workflow_content = """
+name: Build APK
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+      - run: flutter pub get
+      - run: flutter build apk --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: build/app/outputs/flutter-apk/app-release.apk
+"""
 
+        # আপনার টোকেন দিয়ে আপনার রিপোতে অ্যাক্সেস
         admin_gh = Github(GITHUB_TOKEN)
         builder_repo = admin_gh.get_repo(f"{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}")
 
-        # ওয়ার্কফ্লো ফাইল আপডেট করা
+        # ওয়ার্কফ্লো ফাইল আপডেট বা তৈরি করা
         workflow_path = ".github/workflows/build.yml"
         try:
             existing = builder_repo.get_contents(workflow_path)
