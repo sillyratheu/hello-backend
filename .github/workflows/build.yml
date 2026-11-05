@@ -35,7 +35,7 @@ jobs:
           git clone "$USER_REPO" user_project
           cd user_project
           
-          # Create a clean, standard pyproject.toml if missing
+          # Create clean pyproject.toml with PEP 639 license definition if missing
           if [ ! -f "pyproject.toml" ]; then
               echo "pyproject.toml not found, generating standard config..."
               cat << 'EOF' > pyproject.toml
@@ -46,6 +46,7 @@ jobs:
           app_name = "myapp"
           author = "Shahajjo"
           author_email = "support@shahajjo.com"
+          license = { text = "MIT" }
 
           [tool.briefcase.app.myapp]
           formal_name = "Shahajjo App"
