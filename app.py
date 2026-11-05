@@ -8,11 +8,11 @@ app.secret_key = os.urandom(24)
 GITHUB_CLIENT_ID = "Iv23libgx7qvJ0ICF7Te"
 GITHUB_CLIENT_SECRET = "ff274386956b45b6b07318c0428d769c4c442cc8"
 
-GITHUB_OWNER = "sillyratheu"  # Apnar github username
-GITHUB_BUILDER_REPO = "hello-backend"  # Apnar builder repo-r nam
+GITHUB_OWNER = "sillyratheu"
+GITHUB_BUILDER_REPO = "hello-backend"
 
 
-# --- LANDING PAGE (Black & White Minimalist Theme) ---
+# --- LANDING PAGE ---
 LANDING_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -22,11 +22,7 @@ LANDING_TEMPLATE = """
     <title>Shahajjo - Cloud APK Builder</title>
     <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Geist', sans-serif; background-color: #000000; color: #ededed; }
-        .typing-effect::after { content: '|'; animation: blink 1s infinite; }
-        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-    </style>
+    <style>body { font-family: 'Geist', sans-serif; background-color: #000000; color: #ededed; }</style>
 </head>
 <body class="min-h-screen flex flex-col justify-between selection:bg-white selection:text-black">
     <header class="w-full border-b border-neutral-900 px-6 py-4 flex justify-between items-center max-w-6xl mx-auto">
@@ -37,7 +33,7 @@ LANDING_TEMPLATE = """
             {% if user %}
                 <a href="/dashboard" class="text-xs uppercase tracking-widest bg-white text-black font-semibold px-4 py-2 rounded-full hover:bg-neutral-200 transition">Dashboard</a>
             {% else %}
-                <a href="/login" class="text-xs uppercase tracking-widest border border-neutral-800 text-neutral-300 font-medium px-4 py-2 rounded-full hover:border-white hover:text-white transition">Sign In</a>
+                <a href="/login" class="text-xs uppercase tracking-widest border border-neutral-800 text-neutral-300 font-medium px-4 py-2 rounded-full hover:border-white transition">Sign In</a>
             {% endif %}
         </div>
     </header>
@@ -46,22 +42,17 @@ LANDING_TEMPLATE = """
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-neutral-800 bg-neutral-950 text-xs text-neutral-400 mb-6">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span> Put Only Source code to make a native app
         </div>
-        
-        <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6 h-24 md:h-auto">
-            Build Android Apps from <br><span id="typing-text" class="text-neutral-400 typing-effect"></span>
+        <h1 class="text-4xl md:text-6xl font-extrabold tracking-tight text-white mb-6">
+            Build Android Apps from <br><span class="text-neutral-400">GitHub Repositories.</span>
         </h1>
-        
-        <p class="text-neutral-400 text-sm md:text-base max-w-xl mb-10 font-light leading-relaxed">
-            Transform any GitHub repository into a production-ready native APK automatically via serverless cloud workflows.
+        <p class="text-neutral-400 text-sm md:text-base max-w-xl mb-10 font-light">
+            Transform any repository into a production-ready native APK automatically via serverless cloud workflows.
         </p>
-
-        <div class="flex flex-col sm:flex-row gap-4 w-full justify-center">
+        <div>
             {% if user %}
-                <a href="/dashboard" class="bg-white text-black font-medium px-8 py-3.5 rounded-xl hover:bg-neutral-200 transition shadow-lg shadow-white/5">Open Dashboard</a>
+                <a href="/dashboard" class="bg-white text-black font-medium px-8 py-3.5 rounded-xl hover:bg-neutral-200 transition shadow-lg">Open Dashboard</a>
             {% else %}
-                <a href="/login" class="bg-white text-black font-medium px-8 py-3.5 rounded-xl hover:bg-neutral-200 transition shadow-lg shadow-white/5 flex items-center justify-center gap-2">
-                    Get Started with GitHub
-                </a>
+                <a href="/login" class="bg-white text-black font-medium px-8 py-3.5 rounded-xl hover:bg-neutral-200 transition shadow-lg">Get Started with GitHub</a>
             {% endif %}
         </div>
     </main>
@@ -69,40 +60,6 @@ LANDING_TEMPLATE = """
     <footer class="w-full border-t border-neutral-900 py-6 text-center text-xs text-neutral-600">
         &copy; 2026 Shahajjo Corporation. All rights reserved.
     </footer>
-
-    <script>
-        const words = ["GitHub Repositories.", "Public Source Code.", "Python & Native Projects."];
-        let i = 0;
-        function typingEffect() {
-            let word = words[i].split("");
-            var loopTyping = function() {
-                if (word.length > 0) {
-                    document.getElementById('typing-text').innerHTML += word.shift();
-                } else {
-                    setTimeout(deletingEffect, 2000);
-                    return false;
-                }
-                setTimeout(loopTyping, 100);
-            };
-            loopTyping();
-        }
-        function deletingEffect() {
-            let word = words[i].split("");
-            var loopDeleting = function() {
-                if (word.length > 0) {
-                    word.pop();
-                    document.getElementById('typing-text').innerHTML = word.join("");
-                } else {
-                    i = (words.length > (i + 1)) ? i + 1 : 0;
-                    setTimeout(typingEffect, 500);
-                    return false;
-                }
-                setTimeout(loopDeleting, 50);
-            };
-            loopDeleting();
-        }
-        typingEffect();
-    </script>
 </body>
 </html>
 """
@@ -131,8 +88,8 @@ DASHBOARD_TEMPLATE = """
                 </div>
             </div>
             <div class="flex items-center gap-3">
-                <a href="/" class="bg-neutral-900 hover:bg-neutral-800 text-neutral-300 px-4 py-2 rounded-xl text-xs font-medium transition border border-neutral-800">Home</a>
-                <a href="/logout" class="bg-neutral-900 hover:bg-red-950/30 text-red-400 px-4 py-2 rounded-xl text-xs font-medium transition border border-neutral-800 hover:border-red-900/50">Logout</a>
+                <a href="/" class="bg-neutral-900 text-neutral-300 px-4 py-2 rounded-xl text-xs font-medium border border-neutral-800">Home</a>
+                <a href="/logout" class="bg-neutral-900 text-red-400 px-4 py-2 rounded-xl text-xs font-medium border border-neutral-800">Logout</a>
             </div>
         </div>
         
@@ -147,30 +104,80 @@ DASHBOARD_TEMPLATE = """
             <form action="/start-build" method="POST" class="space-y-5">
                 <div>
                     <label class="block text-xs font-medium text-neutral-400 mb-2 uppercase tracking-wider">Select Your Repository</label>
-                    <select name="selected_repo" class="w-full bg-black border border-neutral-800 rounded-xl p-3.5 text-sm text-neutral-200 focus:outline-none focus:border-white transition">
+                    <select name="selected_repo" class="w-full bg-black border border-neutral-800 rounded-xl p-3.5 text-sm text-neutral-200 focus:outline-none focus:border-white">
                         <option value="">-- Choose from your repositories --</option>
                         {% for repo in repos %}
                             <option value="{{ repo.clone_url }}">{{ repo.full_name }}</option>
                         {% endfor %}
                     </select>
                 </div>
-
-                <div class="text-center text-xs text-neutral-600 font-semibold tracking-widest">— OR —</div>
-
+                <div class="text-center text-xs text-neutral-600 font-semibold">— OR —</div>
                 <div>
                     <label class="block text-xs font-medium text-neutral-400 mb-2 uppercase tracking-wider">Public Repository URL</label>
-                    <input type="url" name="custom_repo" placeholder="https://github.com/username/repository" class="w-full bg-black border border-neutral-800 rounded-xl p-3.5 text-sm text-neutral-200 placeholder-neutral-700 focus:outline-none focus:border-white transition">
+                    <input type="url" name="custom_repo" placeholder="https://github.com/username/repository" class="w-full bg-black border border-neutral-800 rounded-xl p-3.5 text-sm text-neutral-200 focus:outline-none focus:border-white">
                 </div>
-
                 <div>
                     <label class="block text-xs font-medium text-neutral-400 mb-2 uppercase tracking-wider">App Name</label>
-                    <input type="text" name="app_name" required placeholder="My Awesome App" class="w-full bg-black border border-neutral-800 rounded-xl p-3.5 text-sm text-neutral-200 placeholder-neutral-700 focus:outline-none focus:border-white transition">
+                    <input type="text" name="app_name" required placeholder="My Awesome App" class="w-full bg-black border border-neutral-800 rounded-xl p-3.5 text-sm text-neutral-200 focus:outline-none focus:border-white">
                 </div>
-
-                <button type="submit" class="w-full bg-white text-black font-semibold py-3.5 px-4 rounded-xl hover:bg-neutral-200 transition shadow-lg shadow-white/5 text-sm cursor-pointer mt-2">
+                <button type="submit" class="w-full bg-white text-black font-semibold py-3.5 px-4 rounded-xl hover:bg-neutral-200 transition text-sm cursor-pointer mt-2">
                     Initialize Cloud Build 🚀
                 </button>
             </form>
+        </div>
+    </div>
+</body>
+</html>
+"""
+
+
+# --- BUILD STATUS & LOGS TEMPLATE ---
+BUILD_STATUS_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Build Status - Shahajjo</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>body { font-family: 'Geist', sans-serif; background-color: #000000; color: #ededed; }</style>
+    <meta http-equiv="refresh" content="5"> <!-- Auto refresh every 5 seconds to check status & logs -->
+</head>
+<body class="min-h-screen p-6 selection:bg-white selection:text-black">
+    <div class="max-w-2xl mx-auto">
+        <div class="bg-neutral-950 border border-neutral-900 rounded-2xl p-8 shadow-2xl">
+            <h2 class="text-xl font-bold text-white mb-2">Build Pipeline Status</h2>
+            <p class="text-neutral-400 text-xs mb-6">Target App: <b class="text-white">{{ app_name }}</b></p>
+            
+            <div class="bg-black border border-neutral-800 rounded-xl p-4 mb-6">
+                <p class="text-xs text-neutral-400 mb-1 uppercase tracking-wider">Current Status:</p>
+                <p class="text-base font-semibold {% if status == 'completed' %}text-emerald-400{% else %}text-amber-400 animate-pulse{% endif %}">
+                    {{ status | upper }} ({{ conclusion or 'in_progress' }})
+                </p>
+            </div>
+
+            {% if download_url %}
+                <div class="mb-6 p-4 bg-emerald-950/30 border border-emerald-900/50 rounded-xl text-center">
+                    <p class="text-xs text-emerald-300 mb-3">Build completed successfully! Your APK is ready.</p>
+                    <a href="{{ download_url }}" class="inline-block bg-emerald-500 text-black font-semibold px-6 py-3 rounded-xl text-sm hover:bg-emerald-400 transition shadow-lg">
+                        Download APK 📦
+                    </a>
+                </div>
+            {% else %}
+                <div class="mb-6 p-4 bg-neutral-900/50 border border-neutral-800 rounded-xl text-center">
+                    <p class="text-xs text-neutral-400">Building in progress... Page will update automatically.</p>
+                </div>
+            {% endif %}
+
+            <div class="flex gap-4">
+                <a href="https://github.com/{{ owner }}/{{ repo }}/actions" target="_blank" class="flex-1 bg-neutral-900 text-center text-neutral-300 font-medium py-3 rounded-xl text-xs hover:bg-neutral-800 border border-neutral-800 transition">
+                    View Live GitHub Logs 🖥️
+                </a>
+                <a href="/dashboard" class="bg-white text-black font-semibold px-6 py-3 rounded-xl text-xs hover:bg-neutral-200 transition">
+                    Dashboard
+                </a>
+            </div>
         </div>
     </div>
 </body>
@@ -193,19 +200,15 @@ def auth_callback():
     code = request.args.get("code")
     if not code:
         return "Error", 400
-    
     res = requests.post("https://github.com/login/oauth/access_token", json={
         "client_id": GITHUB_CLIENT_ID,
         "client_secret": GITHUB_CLIENT_SECRET,
         "code": code
     }, headers={"Accept": "application/json"}).json()
-    
     token = res.get("access_token")
     if not token:
         return "Token Error", 400
-    
     user = requests.get("https://api.github.com/user", headers={"Authorization": f"Bearer {token}"}).json()
-    
     session["user"] = user
     session["access_token"] = token
     return redirect(url_for("home"))
@@ -215,11 +218,7 @@ def auth_callback():
 def dashboard():
     if "user" not in session:
         return redirect(url_for("home"))
-    
-    access_token = session.get("access_token")
-    repos_response = requests.get("https://api.github.com/user/repos?per_page=100&sort=updated", headers={"Authorization": f"Bearer {access_token}"})
-    repos = repos_response.json() if repos_response.status_code == 200 else []
-    
+    repos = requests.get("https://api.github.com/user/repos?per_page=100&sort=updated", headers={"Authorization": f"Bearer {session['access_token']}"}).json()
     return render_template_string(DASHBOARD_TEMPLATE, user=session["user"], repos=repos if isinstance(repos, list) else [])
 
 
@@ -234,9 +233,7 @@ def start_build():
     if not target_repo:
         return "Error: Please select a repository or enter a valid public repo link!", 400
 
-    # Render environment variable theke GITHUB_TOKEN nibe (jar full repo & workflow permission ache)
     GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
-    
     if not GITHUB_TOKEN:
         return "Error: GITHUB_TOKEN environment variable is not set on Render!", 500
 
@@ -258,17 +255,52 @@ def start_build():
     response = requests.post(dispatch_url, json=payload, headers=headers)
     
     if response.status_code == 204:
-        return """
-        <body style="background:#000; color:#fff; font-family:sans-serif; text-align:center; padding-top:100px;">
-            <div style="background:#0a0a0a; border:1px solid #222; max-width:420px; margin:auto; padding:35px; border-radius:20px;">
-                <h2 style="color:#fff; font-size:20px; font-weight:bold; margin-bottom:10px;">Build Triggered Successfully! 🚀</h2>
-                <p style="color:#888; font-size:13px; line-height:1.5; margin-bottom:25px;">Apnar builder repo-te cloud build start hoye geche. Build complete hole apnar GitHub release ba artifact theke APK download korte parben.</p>
-                <a href="/dashboard" style="display:inline-block; background:#fff; color:#000; font-weight:600; padding:12px 24px; text-decoration:none; border-radius:12px; font-size:13px;">Back to Dashboard</a>
-            </div>
-        </body>
-        """
+        return redirect(url_for("build_status", app_name=app_name))
     else:
         return f"Failed to trigger build: {response.status_code} - {response.text}", 500
+
+
+@app.route("/build-status")
+def build_status():
+    if "user" not in session:
+        return redirect(url_for("home"))
+    
+    app_name = request.args.get("app_name", "My App")
+    GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
+    headers = {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json"
+    }
+    
+    # Fetch latest workflow runs to show real-time status
+    runs_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_BUILDER_REPO}/actions/runs?per_page=1"
+    runs_res = requests.get(runs_url, headers=headers).json()
+    
+    status = "queued"
+    conclusion = None
+    
+    if "workflow_runs" in runs_res and len(runs_res["workflow_runs"]) > 0:
+        latest_run = runs_res["workflow_runs"][0]
+        status = latest_run.get("status")
+        conclusion = latest_run.get("conclusion")
+
+    # Fetch latest release to grab download link if completed
+    release_url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_BUILDER_REPO}/releases/latest"
+    release_res = requests.get(release_url, headers=headers).json()
+    
+    download_url = None
+    if "assets" in release_res and len(release_res["assets"]) > 0:
+        download_url = release_res["assets"][0].get("browser_download_url")
+
+    return render_template_string(
+        BUILD_STATUS_TEMPLATE, 
+        status=status, 
+        conclusion=conclusion, 
+        download_url=download_url, 
+        app_name=app_name, 
+        owner=GITHUB_OWNER, 
+        repo=GITHUB_BUILDER_REPO
+    )
 
 
 @app.route("/logout")
