@@ -15,12 +15,13 @@ GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 GITHUB_BUILDER_OWNER = os.getenv("GITHUB_BUILDER_OWNER", "sillyratheu")
 GITHUB_BUILDER_REPO = os.getenv("GITHUB_BUILDER_REPO", "hello-backend")
 
-# ---------- Landing ----------
+# ==========================================
+# LANDING & AUTH
+# ==========================================
 @app.route("/")
 def landing():
     return render_template("landing.html")
 
-# ---------- Auth ----------
 @app.route("/login")
 def login():
     session["next"] = request.args.get("next", "select")
@@ -56,7 +57,9 @@ def logout():
     session.clear()
     return redirect(url_for("landing"))
 
-# ---------- Repo select ----------
+# ==========================================
+# REPO SELECT
+# ==========================================
 @app.route("/select")
 def select_repo():
     if "token" not in session:
@@ -78,17 +81,17 @@ def create_project():
         return jsonify({"error": "not signed in"}), 401
     data = request.json or {}
     repo_name = data.get("repo_name", "").strip()
-    
     gh = Github(session["token"])
     user = gh.get_user()
-    
     try:
         new_repo = user.create_repo(repo_name, auto_init=True)
         return jsonify({"repo": new_repo.full_name})
     except GithubException as e:
-        return jsonify({"error": "Could not create project. Maybe it already exists."}), 400
+        return jsonify({"error": "Could not create project."}), 400
 
-# ---------- Editor ----------
+# ==========================================
+# EDITOR & FILE APIs
+# ==========================================
 @app.route("/editor")
 def editor():
     if "token" not in session:
@@ -98,7 +101,6 @@ def editor():
         return redirect(url_for("select_repo"))
     return render_template("editor.html", repo=repo)
 
-# ---------- File APIs ----------
 @app.route("/api/file", methods=["GET"])
 def get_file():
     if "token" not in session:
@@ -130,16 +132,17 @@ def save_file():
         repo.create_file(path, f"Create {path}", content)
     return jsonify({"status": "saved"})
 
-# ---------- Build System (Fixed without workflow_template.yml) ----------
+# ==========================================
+# BUILD API (FINAL FIX)
+# ==========================================
 @app.route("/api/build", methods=["POST"])
 def build():
     if "token" not in session:
         return jsonify({"error": "not signed in"}), 401
     
     try:
-        # ওয়ার্কফ্লো ফাইলের কোড সরাসরি এখানে দেওয়া হলো
-        workflow_content = """
-name: Build APK
+        # ওয়ার্কফ্লো ফাইলের কোড সরাসরি এখানে
+        workflow_content = """name: Build APK
 on:
   workflow_dispatch:
 jobs:
@@ -161,12 +164,10 @@ jobs:
           name: app-release
           path: build/app/outputs/flutter-apk/app-release.apk
 """
-
-        # আপনার টোকেন দিয়ে আপনার রিপোতে অ্যাক্সেস
         admin_gh = Github(GITHUB_TOKEN)
         builder_repo = admin_gh.get_repo(f"{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}")
 
-        # ওয়ার্কফ্লো ফাইল আপডেট বা তৈরি করা
+        # গিটহাবে build.yml ফাইলটি আপডেট করা
         workflow_path = ".github/workflows/build.yml"
         try:
             existing = builder_repo.get_contents(workflow_path)
@@ -174,7 +175,7 @@ jobs:
         except GithubException:
             builder_repo.create_file(workflow_path, "Add build workflow", workflow_content)
 
-        # Actions ট্রিগার করা
+        # সরাসরি রিকোয়েস্ট পাঠানো (Triggering GitHub Actions)
         url = f"https://api.github.com/repos/{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}/actions/workflows/build.yml/dispatches"
         r = requests.post(
             url,
@@ -193,12 +194,13 @@ jobs:
     except Exception as e:
         return jsonify({"error": f"Server Error: {str(e)}"}), 500
 
-# ---------- Build Status ----------
+# ==========================================
+# BUILD STATUS
+# ==========================================
 @app.route("/api/build-status")
 def build_status():
     if "token" not in session:
         return jsonify({"error": "not signed in"}), 401
-    
     try:
         admin_gh = Github(GITHUB_TOKEN)
         builder_repo = admin_gh.get_repo(f"{GITHUB_BUILDER_OWNER}/{GITHUB_BUILDER_REPO}")
