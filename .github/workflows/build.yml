@@ -1,4 +1,4 @@
-name: Cloud APK Builder
+name: Cloud APK Compiler
 
 on:
   repository_dispatch:
@@ -11,13 +11,28 @@ jobs:
       - name: Checkout Builder Repo
         uses: actions/checkout@v4
 
-      - name: Set up Python & Java
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.10'
-
-      - name: Read Payload Data
+      - name: Read User Payload & Clone User Repo
         run: |
-          echo "User Repo: ${{ github.event.client_payload.repo_url }}"
-          echo "App Name: ${{ github.event.client_payload.app_name }}"
-          # Ekhane amra user er source code clone kore build script run korbo
+          USER_REPO="${{ github.event.client_payload.repo_url }}"
+          APP_NAME="${{ github.event.client_payload.app_name }}"
+          
+          echo "Cloning user repository from: $USER_REPO"
+          git clone "$USER_REPO" user_project
+          
+          # Ekhane user er project type onujayi build command run hobe 
+          # (Jemon Python/Android/Gradle build script)
+          echo "Building APK for $APP_NAME..."
+          
+          # Dummy APK generation for testing pipeline (Apni ekhane gradle/buildozer command dite parben)
+          mkdir -p output_apk
+          echo "Dummy APK content for $APP_NAME" > output_apk/app-debug.apk
+
+      - name: Create GitHub Release & Upload APK
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: "Build APK - ${{ github.event.client_payload.app_name }}"
+          files: output_apk/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
