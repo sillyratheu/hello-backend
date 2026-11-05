@@ -5,28 +5,154 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Editor — Shahajjo Studio</title>
   <link rel="stylesheet" href="/static/style.css">
+  <!-- Monaco Editor Loader -->
   <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+  
+  <style>
+    /* Editor Page Specific Styles */
+    body, html { height: 100%; overflow: hidden; margin: 0; padding: 0; background: #0a0a0a; color: #fff; font-family: monospace; }
+    
+    .topbar {
+      display: flex;
+      align-items: center;
+      padding: 10px 15px;
+      background: #000;
+      border-bottom: 1px solid #333;
+      height: 50px;
+      box-sizing: border-box;
+    }
+    .brand { font-weight: bold; letter-spacing: 2px; margin-right: 20px; color: #888; }
+    .repo-name { font-size: 14px; color: #fff; margin-right: auto; }
+    
+    .controls button {
+      background: transparent;
+      border: 1px solid #fff;
+      color: #fff;
+      padding: 6px 12px;
+      margin-left: 8px;
+      cursor: pointer;
+      font-size: 12px;
+      text-transform: uppercase;
+      transition: 0.2s;
+    }
+    .controls button:hover { background: #fff; color: #000; }
+    
+    .status-badge {
+      font-size: 12px;
+      color: #4ade80;
+      margin-right: 15px;
+      font-weight: bold;
+    }
+
+    /* Split View Container */
+    .main-container {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 50px);
+    }
+    
+    .editor-wrapper {
+      flex: 1; /* Takes up remaining space */
+      min-height: 40vh;
+      border-bottom: 2px solid #333;
+    }
+
+    #editor { width: 100%; height: 100%; }
+
+    /* Output Terminal */
+    .output-wrapper {
+      height: 35vh;
+      background: #050505;
+      display: flex;
+      flex-direction: column;
+      border-top: 1px solid #222;
+    }
+    
+    .output-header {
+      background: #111;
+      padding: 8px 15px;
+      font-size: 12px;
+      color: #888;
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px solid #222;
+    }
+    
+    .output-header button {
+      background: none; border: none; color: #888; cursor: pointer;
+    }
+    .output-header button:hover { color: #fff; }
+
+    #output {
+      flex: 1;
+      padding: 15px;
+      overflow-y: auto;
+      color: #ccc;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 13px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .success-text { color: #4ade80; font-weight: bold; }
+    .error-text { color: #f87171; font-weight: bold; }
+    .info-text { color: #60a5fa; }
+    
+    .download-btn {
+      display: inline-block;
+      background: #fff;
+      color: #000;
+      padding: 10px 20px;
+      text-decoration: none;
+      font-weight: bold;
+      margin-top: 10px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      transition: 0.2s;
+    }
+    .download-btn:hover { background: #ccc; }
+  </style>
 </head>
 <body>
+
+  <!-- Top Navigation Bar -->
   <div class="topbar">
-    <span class="brand">Shahajjo</span>
-    <span class="repo" id="repoLabel">{{ repo }}</span>
-    <button onclick="saveFile()">Save</button>
-    <button onclick="buildApp()">Build APK</button>
-    <button onclick="checkStatus()">Status</button>
-    <button onclick="location.href='/select'">Projects</button>
-    <span id="status">Ready</span>
+    <div class="brand">SHAHAJJO STUDIO</div>
+    <div class="repo-name">{{ repo }}</div>
+    <div class="controls">
+      <span id="status" class="status-badge">Ready</span>
+      <button onclick="saveFile()">Save Code</button>
+      <button onclick="buildApp()">Build APK</button>
+      <button onclick="checkStatus()">Check Status</button>
+      <button onclick="location.href='/select'">Projects</button>
+    </div>
   </div>
 
-  <div id="editor" style="height: calc(100vh - 60px - 130px);"></div>
-  <div id="output">Output will appear here.</div>
+  <!-- Main Editor & Output Area -->
+  <div class="main-container">
+    <!-- Code Editor -->
+    <div class="editor-wrapper">
+      <div id="editor"></div>
+    </div>
+
+    <!-- Output Console -->
+    <div class="output-wrapper">
+      <div class="output-header">
+        <span>CONSOLE OUTPUT</span>
+        <button onclick="document.getElementById('output').innerHTML = ''">Clear</button>
+      </div>
+      <div id="output">> System initialized. Ready to build.</div>
+    </div>
+  </div>
 
   <script>
     const REPO = "{{ repo }}";
     let editor;
 
+    // Load Monaco Editor
     require.config({ paths: { vs: "https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs" } });
     require(["vs/editor/editor.main"], async () => {
+      // Fetch existing code
       const res = await fetch(`/api/file?repo=${encodeURIComponent(REPO)}&path=lib/main.dart`);
       const data = await res.json();
 
@@ -46,54 +172,137 @@ class MyApp extends StatelessWidget {
   }
 }`;
 
+      // Initialize Editor
       editor = monaco.editor.create(document.getElementById("editor"), {
         value: data.content || defaultCode,
         language: "dart",
         theme: "vs-dark",
         automaticLayout: true,
         fontSize: 14,
+        minimap: { enabled: false }, // Mobile friendly
+        padding: { top: 15 }
       });
     });
 
-    function setStatus(msg) { document.getElementById("status").textContent = msg; }
-    function log(msg) {
-      const el = document.getElementById("output");
-      el.textContent = "> " + msg + "\n" + el.textContent;
+    // Helper functions for logging
+    function setStatus(msg, isError = false) { 
+      const el = document.getElementById("status");
+      el.textContent = msg; 
+      el.style.color = isError ? "#f87171" : "#4ade80";
     }
 
+    function log(msg, type = 'normal') {
+      const el = document.getElementById("output");
+      const div = document.createElement("div");
+      
+      if (type === 'error') div.className = "error-text";
+      else if (type === 'success') div.className = "success-text";
+      else if (type === 'info') div.className = "info-text";
+      
+      div.textContent = `> ${msg}`;
+      el.appendChild(div);
+      el.scrollTop = el.scrollHeight; // Auto-scroll to bottom
+    }
+
+    // 1. Save Code Function
     async function saveFile() {
       setStatus("Saving...");
-      const res = await fetch("/api/file", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          repo: REPO,
-          path: "lib/main.dart",
-          content: editor.getValue(),
-        }),
-      });
-      const data = await res.json();
-      setStatus(data.status === "saved" ? "Saved" : "Save failed");
-      log(data.status === "saved" ? "Code saved successfully." : "Save failed.");
+      log("Attempting to save lib/main.dart...", 'info');
+      
+      try {
+        const res = await fetch("/api/file", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            repo: REPO,
+            path: "lib/main.dart",
+            content: editor.getValue(),
+          }),
+        });
+        const data = await res.json();
+        
+        if (data.status === "saved") {
+          setStatus("Saved");
+          log("Code saved successfully to your repository.", 'success');
+        } else {
+          setStatus("Save Failed", true);
+          log(`Save failed: ${data.error || 'Unknown error'}`, 'error');
+        }
+      } catch (err) {
+        setStatus("Network Error", true);
+        log(`Fetch error: ${err.message}`, 'error');
+      }
     }
 
+    // 2. Build APK Function
     async function buildApp() {
-      setStatus("Starting build...");
-      const res = await fetch("/api/build", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ repo: REPO }),
-      });
-      const data = await res.json();
-      setStatus(data.status === "building" ? "Building..." : "Build failed");
-      log(JSON.stringify(data));
+      setStatus("Triggering Build...");
+      log("Initiating build process on the server...", 'info');
+      
+      try {
+        const res = await fetch("/api/build", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ repo: REPO }),
+        });
+        const data = await res.json();
+        
+        if (res.ok && data.status === "building") {
+          setStatus("Building...");
+          log("Build successfully triggered on GitHub Actions.", 'success');
+          log("Please wait a few minutes, then click 'Check Status'.", 'info');
+        } else {
+          setStatus("Build Failed", true);
+          log(`Error: ${data.error || "Could not trigger build."}`, 'error');
+        }
+      } catch (err) {
+        setStatus("Network Error", true);
+        log(`Fetch error: ${err.message}`, 'error');
+      }
     }
 
+    // 3. Check Status & Download Link
     async function checkStatus() {
-      const res = await fetch(`/api/build-status?repo=${encodeURIComponent(REPO)}`);
-      const data = await res.json();
-      setStatus(`${data.status}${data.conclusion ? " / " + data.conclusion : ""}`);
-      log(JSON.stringify(data, null, 2));
+      setStatus("Checking...");
+      log("Fetching latest build status from GitHub...", 'info');
+      
+      try {
+        const res = await fetch(`/api/build-status?repo=${encodeURIComponent(REPO)}`);
+        const data = await res.json();
+        
+        if (data.status === "no runs yet") {
+          setStatus("No Builds");
+          log("No builds found yet. Click 'Build APK' first.", 'error');
+          return;
+        }
+
+        setStatus(`${data.status.toUpperCase()}`);
+        
+        if (data.conclusion === "success" && data.artifacts && data.artifacts.length > 0) {
+          log("Build Successful!", 'success');
+          const downloadUrl = data.artifacts[0].url;
+          
+          // Create download button in output
+          const el = document.getElementById("output");
+          const btnDiv = document.createElement("div");
+          btnDiv.innerHTML = `
+            <br>
+            <a href="${downloadUrl}" target="_blank" class="download-btn">
+              ⬇️ Download APK
+            </a>
+          `;
+          el.appendChild(btnDiv);
+          el.scrollTop = el.scrollHeight;
+          
+        } else if (data.conclusion === "failure") {
+          log("Build Failed! Please check your Flutter code or repository files.", 'error');
+        } else {
+          log(`Current Status: ${data.status}. GitHub Actions is still working...`, 'info');
+        }
+      } catch (err) {
+        setStatus("Error", true);
+        log(`Fetch error: ${err.message}`, 'error');
+      }
     }
   </script>
 </body>
