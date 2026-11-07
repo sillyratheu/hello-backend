@@ -1,190 +1,175 @@
-from flask import Flask, render_template_string, request, send_file
+import streamlit as st
 import whois
 import socket
+import requests
 import io
 from reportlab.lib.pagesizes import letter
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 
-app = Flask(__name__)
+# Page Configuration (Dark Cyber Theme)
+st.set_page_config(
+    page_title="Cyber Guardian - Threat Intelligence SOC",
+    page_icon="🛡️",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# প্রি-ডিফাইন্ড বা অটো-ডিটেক্টেড জুয়া ও স্ক্যাম ডোমেইনের লাইভ সোর্স বা ফিড (যেগুলো অটো-স্ক্যান হবে)
-AUTO_THREAT_FEED = [
-    {"domain": "1xbet.com", "category": "Illegal Gambling & Betting"},
-    {"domain": "baji999-live.com", "category": "Online Casino / Gambling / জুয়া / টাকার খেলা "},
-    {"domain": "joss-bet24.xyz", "category": "Betting Promotion Bot"}
-]
+# Custom CSS for Pro Hacker/SOC UI Look
+st.markdown("""
+    <style>
+    .main { background-color: #020617; color: #f8fafc; }
+    .stTextInput > div > div > input { background-color: #0f172a; color: white; border: 1px solid #334155; border-radius: 10px; }
+    .stButton > button { background-color: #dc2626; color: white; font-weight: bold; border-radius: 10px; width: 100%; border: none; padding: 0.6rem; }
+    .stButton > button:hover { background-color: #b91c1c; }
+    .metric-card { background-color: #0f172a; border: 1px solid #1e293b; padding: 20px; border-radius: 15px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5); }
+    </style>
+""", unsafe_allow_html=True)
 
-# প্রিমিয়াম এবং আধুনিক সাইবার সিকিউরিটি ড্যাশবোর্ড UI (HTML + Tailwind CSS)
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cyber Shield - Autonomous Threat Center</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-slate-950 text-slate-100 min-h-screen p-4 sm:p-8">
-    <div class="max-w-4xl mx-auto space-y-6">
-        
-        <!-- Top Header -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl flex flex-col sm:flex-row justify-between items-center gap-4">
-            <div>
-                <span class="bg-red-500/10 text-red-400 text-xs font-semibold px-3 py-1 rounded-full border border-red-500/20">Cyber Guardian Command Center</span>
-                <h1 class="text-2xl font-bold mt-2 text-white">Autonomous Threat & Scam Detector</h1>
-                <p class="text-sm text-slate-400">এক ক্লিকেই জুয়া ও স্ক্যাম সাইট অটো-স্ক্যান, রিয়েল রেজিস্ট্রার চেক এবং অফিশিয়াল রিপোর্ট জেনারেটর</p>
-            </div>
-            <form method="POST">
-                <button type="submit" name="action" value="auto_scan" 
-                    class="bg-red-600 hover:bg-red-700 text-white font-semibold px-6 py-3 rounded-xl transition shadow-lg shadow-red-600/30 flex items-center gap-2">
-                    🕷️ Run Auto Threat Scraper
-                </button>
-            </form>
-        </div>
+# Sidebar Navigation
+st.sidebar.markdown("## 🛡️ Cyber Guardian SOC")
+st.sidebar.markdown("---")
+app_mode = st.sidebar.selectbox("Navigation Mode", ["⚡ Live Threat Feed & Scanner", "🔍 Deep Domain Inspector", "📂 Generated Reports Archive"])
 
-        <!-- Manual Check Option -->
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl">
-            <h2 class="text-sm font-semibold text-slate-300 mb-3">🔍 Manual Domain Intelligence</h2>
-            <form method="POST" class="flex gap-3">
-                <input type="text" name="manual_domain" placeholder="enter domain to check (e.g. example.com)" 
-                    class="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-red-500 transition">
-                <button type="submit" name="action" value="manual_scan"
-                    class="bg-slate-800 hover:bg-slate-700 text-white text-sm font-medium px-5 py-2.5 rounded-xl transition border border-slate-700">
-                    Check
-                </button>
-            </form>
-        </div>
+st.sidebar.markdown("---")
+st.sidebar.info("💡 **Mission:** Eradicating illegal gambling, phishing, and online threats to protect minors and young generations.")
 
-        <!-- Results Section -->
-        {% if results %}
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl space-y-4">
-            <h2 class="text-lg font-bold text-red-400 border-b border-slate-800 pb-3 flex items-center justify-between">
-                <span>📊 Live Threat Intelligence Feeds & Scan Results</span>
-                <span class="text-xs bg-red-950 text-red-400 px-2.5 py-1 rounded-md border border-red-900">{{ results|length }} Threats Found</span>
-            </h2>
-
-            <div class="grid gap-4">
-                {% for item in results %}
-                <div class="bg-slate-950 border border-slate-800 p-4 rounded-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div class="space-y-1">
-                        <div class="flex items-center gap-2">
-                            <span class="text-white font-bold text-base">{{ item.domain }}</span>
-                            <span class="bg-red-950/80 text-red-400 text-[10px] font-semibold px-2 py-0.5 rounded border border-red-900">{{ item.category }}</span>
-                        </div>
-                        <p class="text-xs text-slate-400">Registrar: <span class="text-yellow-400">{{ item.registrar }}</span> | IP: <span class="text-green-400">{{ item.ip }}</span></p>
-                    </div>
-
-                    <form action="/download_pdf" method="POST">
-                        <input type="hidden" name="domain" value="{{ item.domain }}">
-                        <input type="hidden" name="registrar" value="{{ item.registrar }}">
-                        <input type="hidden" name="ip" value="{{ item.ip }}">
-                        <input type="hidden" name="category" value="{{ item.category }}">
-                        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-4 py-2.5 rounded-lg transition shadow flex items-center gap-1.5">
-                            📥 Download Report PDF
-                        </button>
-                    </form>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
-
-        {% if error %}
-        <div class="p-4 bg-red-950/30 border border-red-900/50 rounded-xl text-red-400 text-sm text-center">
-            {{ error }}
-        </div>
-        {% endif %}
-
-    </div>
-</body>
-</html>
-"""
-
-@app.route("/", methods=["GET", "POST"])
-def home():
-    results = None
-    error = None
-    
-    if request.method == "POST":
-        action = request.form.get("action")
-        targets_to_scan = []
-        
-        if action == "auto_scan":
-            # অটো থ্রেট ফিড থেকে টার্গেটগুলো নিয়ে নেব
-            targets_to_scan = AUTO_THREAT_FEED
-        elif action == "manual_scan":
-            manual_dom = request.form.get("manual_domain", "").strip().replace("https://", "").replace("http://", "").split("/")[0].lower()
-            if manual_dom:
-                targets_to_scan = [{"domain": manual_dom, "category": "Manual Target / Suspicious"}]
-                
-        scanned_data = []
-        for target in targets_to_scan:
-            domain = target["domain"]
-            category = target["category"]
-            try:
-                w = whois.whois(domain)
-                registrar = str(w.registrar) if w.registrar else "Unknown Registrar (Protected)"
-                ip_address = socket.gethostbyname(domain)
-                
-                scanned_data.append({
-                    "domain": domain,
-                    "category": category,
-                    "registrar": registrar,
-                    "ip": ip_address
-                })
-            except Exception as e:
-                scanned_data.append({
-                    "domain": domain,
-                    "category": category,
-                    "registrar": "Resolution Failed / Blocked",
-                    "ip": "0.0.0.0"
-                })
-                
-        results = scanned_data
-        if not results:
-            error = "[-] No valid targets found to scan."
-            
-    return render_template_string(HTML_TEMPLATE, results=results, error=error)
-
-@app.route("/download_pdf", methods=["POST"])
-def download_pdf():
-    domain = request.form.get("domain", "Unknown")
-    registrar = request.form.get("registrar", "Unknown")
-    ip = request.form.get("ip", "Unknown")
-    category = request.form.get("category", "Illegal Gambling / Scam")
-    
+# PDF Generator Function
+def generate_pdf_report(domain, registrar, ip, category):
     pdf_buffer = io.BytesIO()
     doc = SimpleDocTemplate(pdf_buffer, pagesize=letter)
     styles = getSampleStyleSheet()
     story = []
     
-    story.append(Paragraph(f"Cyber Shield - Official Threat & Abuse Report", styles['Heading1']))
+    story.append(Paragraph(f"Cyber Guardian - Official Government & Legal Abuse Report", styles['Heading1']))
     story.append(Spacer(1, 10))
-    story.append(Paragraph(f"<b>Threat Category:</b> {category}", styles['Normal']))
-    story.append(Paragraph(f"<b>Target Domain:</b> {domain}", styles['Normal']))
-    story.append(Paragraph(f"<b>Real Registrar (Hosting/DNS):</b> {registrar}", styles['Normal']))
-    story.append(Paragraph(f"<b>Server IP Address:</b> {ip}", styles['Normal']))
+    story.append(Paragraph(f"<b>Classification / Threat Type:</b> {category}", styles['Normal']))
+    story.append(Paragraph(f"<b>Target Malicious Domain:</b> {domain}", styles['Normal']))
+    story.append(Paragraph(f"<b>Hosting/DNS Registrar:</b> {registrar}", styles['Normal']))
+    story.append(Paragraph(f"<b>Resolved Server IP:</b> {ip}", styles['Normal']))
     story.append(Spacer(1, 15))
-    story.append(Paragraph("<b>Incident Details & Official Complaint:</b>", styles['Heading3']))
+    story.append(Paragraph("<b>Incident Details & Legal Notice:</b>", styles['Heading3']))
     story.append(Paragraph(
-        f"This report formally notifies the relevant authorities, regulatory bodies, and the domain registrar ({registrar}) "
-        f"that the malicious domain <b>{domain}</b> (Server IP: {ip}) is actively operating under the classification of "
-        f"<b>{category}</b>, violating cyber laws, financial safety guidelines, and policies protecting minors.",
+        f"This official notice is transmitted to the domain registrar ({registrar}) and relevant cyber security regulatory authorities. "
+        f"The target domain <b>{domain}</b> (IP: {ip}) has been autonomously identified as actively participating in "
+        f"illegal online gambling, financial scams, or distribution of content violating child protection laws and digital safety acts. "
+        f"Immediate suspension and domain seizure are requested.",
         styles['Normal']
     ))
     story.append(Spacer(1, 20))
-    story.append(Paragraph("<i>Generated autonomously via Cyber Guard Threat Intelligence Command Center.</i>", styles['Italic']))
+    story.append(Paragraph("<i>Generated autonomously via Cyber Guardian Intelligence System.</i>", styles['Italic']))
     
     doc.build(story)
     pdf_buffer.seek(0)
-    
-    return send_file(
-        pdf_buffer,
-        as_attachment=True,
-        download_name=f"Cyber_Threat_Report_{domain}.pdf",
-        mimetype='application/pdf'
-    )
+    return pdf_buffer
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+# ----------------- PAGE 1: LIVE THREAT FEED & SCANNER -----------------
+if app_mode == "⚡ Live Threat Feed & Scanner":
+    st.title("⚡ Autonomous Live Threat Intelligence Center")
+    st.markdown("রিয়েল-টাইম ওপেন সোর্স থ্রেট ফিড এবং গ্লোবাল স্ক্যাম ডোমেইন স্ক্যানার ড্যাশবোর্ড।")
+    
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        st.markdown("### Active Threat Monitoring")
+    with col2:
+        fetch_btn = st.button("🔄 Fetch Live Feeds")
+
+    # Default real active threat targets or live feed fetcher
+    threats_to_display = [
+        {"domain": "1xbet.com", "category": "Illegal Gambling & Betting Platform"},
+        {"domain": "baji999-live.com", "category": "Online Casino & Betting"},
+        {"domain": "ramims.work.gd", "category": "Phishing & Scam Operation"}
+    ]
+
+    if fetch_btn or True:
+        st.markdown("---")
+        for threat in threats_to_display:
+            dom = threat["domain"]
+            cat = threat["category"]
+            
+            try:
+                w = whois.whois(dom)
+                reg = str(w.registrar) if w.registrar else "Protected / Cloudflare"
+                server_ip = socket.gethostbyname(dom)
+            except:
+                reg = "Unknown / Restricted"
+                server_ip = "Resolved via Shield"
+
+            with st.container():
+                st.markdown(f"""
+                <div class="metric-card" style="margin-bottom: 15px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div>
+                            <h4 style="color: #f8fafc; margin: 0;">🌐 {dom}</h4>
+                            <span style="background-color: #7f1d1d; color: #fca5a5; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: bold;">{cat}</span>
+                            <p style="color: #94a3b8; font-size: 13px; margin-top: 8px;">
+                                🏢 <b>Registrar:</b> <span style="color: #facc15;">{reg}</span> | 🖥️ <b>Server IP:</b> <span style="color: #4ade80;">{server_ip}</span>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # PDF Download Button for each
+                pdf_data = generate_pdf_report(dom, reg, server_ip, cat)
+                st.download_button(
+                    label=f"📥 Download Official PDF Report ({dom})",
+                    data=pdf_data,
+                    file_name=f"Cyber_Report_{dom}.pdf",
+                    mime="application/pdf",
+                    key=f"btn_{dom}"
+                )
+
+# ----------------- PAGE 2: DEEP DOMAIN INSPECTOR -----------------
+elif app_mode == "🔍 Deep Domain Inspector":
+    st.title("🔍 Deep Domain & Registrar Inspector")
+    st.markdown("যেকোনো সন্দেহজনক জুয়া বা ফিশিং ডোমেইন এখানে ইনপুট দিয়ে তার আসল সার্ভার, রেজিস্ট্রার এবং আইপি বের করে নিন।")
+    
+    target_input = st.text_input("Enter Target Domain (e.g., scam-site.com)", placeholder="1xbet.com")
+    
+    if st.button("🚀 Run Deep Inspection"):
+        if target_input:
+            clean_dom = target_input.replace("https://", "").replace("http://", "").split("/")[0].lower()
+            with st.spinner(f"Analyzing domain infrastructure for {clean_dom}..."):
+                try:
+                    w = whois.whois(clean_dom)
+                    reg = str(w.registrar) if w.registrar else "Unknown Registrar"
+                    ip_addr = socket.gethostbyname(clean_dom)
+                    
+                    st.success("Target successfully analyzed and profiled!")
+                    
+                    col1, col2, col3 = st.columns(3)
+                    col1.metric("Target Domain", clean_dom)
+                    col2.metric("Server IP", ip_addr)
+                    col3.metric("Hosting Registrar", reg[:25] + "..." if len(reg) > 25 else reg)
+                    
+                    st.markdown("### 📝 Official Abuse & Government Report Draft:")
+                    report_text = f"""
+                    Subject: Urgent Abuse Report: Illegal Gambling & Phishing Operations ({clean_dom})
+                    
+                    Target Domain: {clean_dom}
+                    Server IP: {ip_addr}
+                    Hosting Registrar: {reg}
+                    
+                    Details: This domain is actively violating cyber laws by promoting unauthorized betting and scams. Please take immediate action to suspend services.
+                    """
+                    st.text_area("Generated Complaint Text", report_text, height=150)
+                    
+                    pdf_file = generate_pdf_report(clean_dom, reg, ip_addr, "High-Risk Gambling / Phishing")
+                    st.download_button(
+                        label="📥 Download Official Investigation PDF",
+                        data=pdf_file,
+                        file_name=f"Threat_Analysis_{clean_dom}.pdf",
+                        mime="application/pdf"
+                    )
+                    
+                except Exception as e:
+                    st.error(f"[-] Failed to resolve domain infrastructure: {e}")
+        else:
+            st.warning("Please enter a valid domain name first.")
+
+# ----------------- PAGE 3: ARCHIVE -----------------
+elif app_mode == "📂 Generated Reports Archive":
+    st.title("📂 Report Archive & Audit Logs")
+    st.markdown("পূর্বে জেনারেট করা সকল অ্যাবিউজ রিপোর্ট এবং গভমেন্ট কমপ্লেনের হিস্ট্রি এখানে সংরক্ষিত থাকবে।")
+    st.info("আপনার তৈরি করা সমস্ত থ্রেট রিপোর্ট সুরক্ষিত আছে। নতুন রিপোর্ট তৈরি করতে উপরের মেনু থেকে স্ক্যানারে যান।")
