@@ -1,5 +1,3 @@
 Flask
-gunicorn
+python-whois
 requests
-python-dotenv
-PyGithub
