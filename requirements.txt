@@ -1,6 +1,5 @@
 streamlit
-Flask
 python-whois
 requests
-beautifulsoup4
 reportlab
+playwright
